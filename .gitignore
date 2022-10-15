@@ -1,3 +1,5 @@
 /wxWidgets
 
+# MS Windows nonsense
 **/*.dll
+**/*.exe

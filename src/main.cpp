@@ -16,28 +16,6 @@
 #include <string>
 #include <unordered_set>
 
-class App : public wxApp {
-public:
-    virtual bool OnInit() override;
-};
-
-class Frame : public wxFrame {
-public:
-    Frame();
-private:
-    void OnEntryClick(wxCommandEvent &event);
-    void OnTagSelectionChange(wxCommandEvent &event);
-    void OnExit(wxCommandEvent& event);
-
-    wxBoxSizer* layout;
-
-    wxListBox *tag_list;
-    wxArrayString tags;
-
-    wxBoxSizer* entry_list;
-    std::vector<wxButton*> entries;
-};
-
 struct Entry;
 
 struct Tag {
@@ -71,18 +49,146 @@ Tag* add_tag(std::vector<Tag>& tags, Tag& new_tag) {
     return &tags.back();
 }
 
+class App : public wxApp {
+public:
+    virtual bool OnInit() override;
+};
+
+class Frame : public wxFrame {
+public:
+    Frame();
+private:
+    void OnEntryClick(wxCommandEvent &event);
+    void OnTagSelectionChange(wxCommandEvent &event);
+    void OnExit(wxCommandEvent& event);
+
+    std::vector<Tag> tag_data;
+    std::unordered_set<size_t> tags_shown;
+    std::unordered_set<size_t> tags_selected;
+    void build_tag_gui();
+    wxListBox *tag_list;
+    wxArrayString tags;
+
+    std::vector<Entry> entry_data;
+    std::unordered_set<size_t> entries_shown;
+    void build_entry_gui();
+
+    wxBoxSizer* layout;
+    wxBoxSizer* entry_list;
+};
+
+void Frame::build_tag_gui() {
+    // TODO: Repurpose existing elements (change string in-place)
+    // without having to clear and re-create entire tags array and tag
+    // list each time.
+    tags.Clear();
+    for (size_t tag_index : tags_shown) {
+        const Tag& tag = tag_data.at(tag_index);
+        tags.Add(wxString(tag.tag.data()));
+    }
+    // Create new tag list from tags array.
+    tag_list->Create
+        (this, 0,
+         wxDefaultPosition, wxDefaultSize,
+         tags.Count(), tags.begin(),
+         wxLB_MULTIPLE);
+}
+
+void Frame::build_entry_gui() {
+    // TODO: Repurpose existing buttons, only changing strings
+    // in-place, to reduce time spent destroying and re-building
+    // buttons.
+    entry_list->Clear(true);
+    for (size_t entry_index : entries_shown) {
+        const Entry& entry = entry_data.at(entry_index);
+        wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
+        entry_list->Add(button, 1, 0);
+    }
+}
+
+void Frame::OnTagSelectionChange(wxCommandEvent &event)
+{
+    const Tag& tag = tag_data.at(event.GetInt());
+
+    if (event.IsSelection()) {
+        // Selected.
+        // Add tag to selected tags.
+        tags_selected.insert(tag.index);
+    } else {
+        // Deselected.
+        // Remove tag from selected tags.
+        tags_selected.erase(tag.index);
+    }
+
+    // Update entries shown based on set intersection of all selected tags' entries.
+    entries_shown.clear();
+    for (const Entry& entry : entry_data) {
+        // If entry is contained in *all* selected tags, make entry shown.
+        bool has_all_tags = true;
+        for (size_t tag_index : tags_selected) {
+            const Tag& selected_tag = tag_data.at(tag_index);
+            if (!selected_tag.entries.contains(entry.index)) {
+                has_all_tags = false;
+                break;
+            }
+        }
+        if (has_all_tags) {
+            // Make entry shown iff it has all selected tags.
+            entries_shown.insert(entry.index);
+        }
+    }
+
+    // Update tags shown based on set intersection of all shown entries' tags.
+    tags_shown.clear();
+    for (const Tag& tag : tag_data) {
+        for (size_t entry_index : entries_shown) {
+            const Entry& entry = entry_data.at(entry_index);
+            if (entry.tags.contains(tag.index)) {
+                tags_shown.insert(tag.index);
+                break;
+            }
+        }
+    }
+
+    std::cout << "\nSelected:\n";
+    for (size_t tag_index : tags_selected) {
+        const Tag& tag = tag_data.at(tag_index);
+        std::cout << tag.tag << " - " << tag.index << "\n";
+    }
+
+    std::cout << "\nShown:\n";
+    for (size_t tag_index : tags_shown) {
+        const Tag& tag = tag_data.at(tag_index);
+        std::cout << tag.tag << " - " << tag.index << "\n";
+    }
+
+    std::cout << "\nShown Entries:\n";
+    for (size_t entry_index : entries_shown) {
+        const Entry& entry = entry_data.at(entry_index);
+        std::cout << entry.filepath << " - " << entry.index << "\n";
+    }
+
+    std::cout << std::flush;
+
+    // Redisplay (remake frame basically).
+    build_tag_gui();
+    build_entry_gui();
+
+    std::cout << tag.tag << " - " << tag.index << std::endl;
+}
+
+void Frame::OnEntryClick(wxCommandEvent &event)
+{
+    const Entry& entry = entry_data.at(event.GetId());
+    std::cout << entry.filepath << " - " << entry.index << std::endl;
+}
+
 Frame::Frame()
     : wxFrame(NULL, 0, "C-NOTE")
 {
     SetFont(GetFont().Scale(1.5));
 
-    // TODO: Create tags/entries data structure(s).
-
-    // TODO: Maybe store these vectors in one struct?
-    std::vector<Tag> tag_data;
-    std::vector<Entry> entry_data;
-
-    // TODO: Loop over all files in the current directory.
+    // Loop over all files in the current directory.
     auto dir = std::filesystem::directory_iterator(".");
     for (const auto& dir_it : dir) {
         const auto& path = dir_it.path();
@@ -193,8 +299,8 @@ Frame::Frame()
          wxLB_MULTIPLE);
 
     // Populate entry_list.
-    for (int i = 0; i < 10; ++i) {
-        wxButton *button = new wxButton(this, i, wxString(std::to_string(i)));
+    for (const Entry& entry : entry_data) {
+        wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
         entry_list->Add(button, 1, 0);
     }
 
@@ -202,6 +308,9 @@ Frame::Frame()
     layout->Add(entry_list);
 
     SetSizer(layout);
+
+    Bind(wxEVT_LISTBOX, &Frame::OnTagSelectionChange, this);
+    Bind(wxEVT_BUTTON, &Frame::OnEntryClick, this);
 }
 
 bool App::OnInit() {
