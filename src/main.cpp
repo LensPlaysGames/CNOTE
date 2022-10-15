@@ -1,5 +1,3 @@
-#include <string.h>
-#include <string_view>
 #ifdef _WIN32
 #  define __WXMSW__
 #endif
@@ -13,8 +11,11 @@
 #endif
 
 #include <filesystem>
+#include <string.h>
 #include <string>
+#include <set>
 #include <unordered_set>
+#include <map>
 
 struct Entry;
 
@@ -73,6 +74,9 @@ private:
     std::unordered_set<size_t> entries_shown;
     void build_entry_gui();
 
+    // Index within tag_list -> Index within tag_data
+    std::map<size_t, size_t> tag_list_indices;
+
     wxBoxSizer* layout;
     wxBoxSizer* entry_list;
 };
@@ -81,17 +85,24 @@ void Frame::build_tag_gui() {
     // TODO: Repurpose existing elements (change string in-place)
     // without having to clear and re-create entire tags array and tag
     // list each time.
+    std::unordered_set<size_t> tags_selected_list_index;
     tags.Clear();
+    tag_list_indices.clear();
     for (size_t tag_index : tags_shown) {
-        const Tag& tag = tag_data.at(tag_index);
+        Tag& tag = tag_data.at(tag_index);
+        if (tags_selected.contains(tag_index)) {
+            std::cout << tag_index << " is shown and selected. " << tags.GetCount() << std::endl;
+            tags_selected_list_index.insert(tags.GetCount());
+        }
+        tag_list_indices[tags.GetCount()] = tag_index;
+
         tags.Add(wxString(tag.tag.data()));
     }
     // Create new tag list from tags array.
-    tag_list->Create
-        (this, 0,
-         wxDefaultPosition, wxDefaultSize,
-         tags.Count(), tags.begin(),
-         wxLB_MULTIPLE);
+    tag_list->Set(tags);
+    for (size_t selected_tag_list_index : tags_selected_list_index) {
+        tag_list->SetSelection(selected_tag_list_index);
+    }
 }
 
 void Frame::build_entry_gui() {
@@ -104,82 +115,126 @@ void Frame::build_entry_gui() {
         wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
         entry_list->Add(button, 1, 0);
     }
+    entry_list->Layout();
 }
 
 void Frame::OnTagSelectionChange(wxCommandEvent &event)
 {
-    const Tag& tag = tag_data.at(event.GetInt());
+    std::cout << "\ntag int: " << event.GetInt() << "\n";
 
-    if (event.IsSelection()) {
-        // Selected.
-        // Add tag to selected tags.
-        tags_selected.insert(tag.index);
-    } else {
-        // Deselected.
-        // Remove tag from selected tags.
-        tags_selected.erase(tag.index);
-    }
+    std::cout << "\nmap:\n";
+    try {
 
-    // Update entries shown based on set intersection of all selected tags' entries.
-    entries_shown.clear();
-    for (const Entry& entry : entry_data) {
-        // If entry is contained in *all* selected tags, make entry shown.
-        bool has_all_tags = true;
+        for (const auto& [tag_list_index, tag_data_index] : tag_list_indices) {
+            std::cout << "  (" << tag_list_index << ", " << tag_data_index << ")\n";
+        }
+        std::cout << std::flush;
+
+        size_t tag_data_index = tag_list_indices.at(event.GetInt());
+
+        std::cout << "\nnew int: " << event.GetInt() << "\n";
+        std::cout << std::flush;
+
+        const Tag& tag = tag_data.at(tag_data_index);
+
+        if (event.IsSelection()) {
+            // Selected.
+            // Add tag to selected tags.
+            tags_selected.insert(tag.index);
+        } else {
+            // Deselected.
+            // Remove tag from selected tags.
+            tags_selected.erase(tag.index);
+        }
+
+        // Update entries shown based on set intersection of all selected tags' entries.
+        entries_shown.clear();
+        for (const Entry& entry : entry_data) {
+            // If entry is contained in *all* selected tags, make entry shown.
+            bool has_all_tags = true;
+            for (size_t tag_index : tags_selected) {
+                const Tag& selected_tag = tag_data.at(tag_index);
+                if (!selected_tag.entries.contains(entry.index)) {
+                    has_all_tags = false;
+                    break;
+                }
+            }
+            if (has_all_tags) {
+                // Make entry shown iff it has all selected tags.
+                entries_shown.insert(entry.index);
+            }
+        }
+
+        // Update tags shown based on set intersection of all shown entries' tags.
+        tags_shown.clear();
+        for (const Tag& tag : tag_data) {
+            for (size_t entry_index : entries_shown) {
+                const Entry& entry = entry_data.at(entry_index);
+                if (entry.tags.contains(tag.index)) {
+                    tags_shown.insert(tag.index);
+                    break;
+                }
+            }
+        }
+
+        std::cout << "\nSelected:\n";
         for (size_t tag_index : tags_selected) {
-            const Tag& selected_tag = tag_data.at(tag_index);
-            if (!selected_tag.entries.contains(entry.index)) {
-                has_all_tags = false;
-                break;
-            }
+            const Tag& tag = tag_data.at(tag_index);
+            std::cout << tag.tag << " - " << tag.index << "\n";
         }
-        if (has_all_tags) {
-            // Make entry shown iff it has all selected tags.
-            entries_shown.insert(entry.index);
-        }
+
+        //    std::cout << "\nShown:\n";
+        //    for (size_t tag_index : tags_shown) {
+        //        const Tag& tag = tag_data.at(tag_index);
+        //        std::cout << tag.tag << " - " << tag.index << "\n";
+        //    }
+        //
+        //    std::cout << "\nShown Entries:\n";
+        //    for (size_t entry_index : entries_shown) {
+        //        const Entry& entry = entry_data.at(entry_index);
+        //        std::cout << entry.filepath << " - " << entry.index << "\n";
+        //    }
+
+        std::cout << std::flush;
+
+        // Redisplay (remake frame basically).
+        build_tag_gui();
+        build_entry_gui();
+        layout->Layout();
+
+        std::cout << tag.tag << " - " << tag.index << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
     }
 
-    // Update tags shown based on set intersection of all shown entries' tags.
-    tags_shown.clear();
-    for (const Tag& tag : tag_data) {
-        for (size_t entry_index : entries_shown) {
-            const Entry& entry = entry_data.at(entry_index);
-            if (entry.tags.contains(tag.index)) {
-                tags_shown.insert(tag.index);
-                break;
-            }
-        }
-    }
-
-    std::cout << "\nSelected:\n";
-    for (size_t tag_index : tags_selected) {
-        const Tag& tag = tag_data.at(tag_index);
-        std::cout << tag.tag << " - " << tag.index << "\n";
-    }
-
-    std::cout << "\nShown:\n";
-    for (size_t tag_index : tags_shown) {
-        const Tag& tag = tag_data.at(tag_index);
-        std::cout << tag.tag << " - " << tag.index << "\n";
-    }
-
-    std::cout << "\nShown Entries:\n";
-    for (size_t entry_index : entries_shown) {
-        const Entry& entry = entry_data.at(entry_index);
-        std::cout << entry.filepath << " - " << entry.index << "\n";
-    }
-
-    std::cout << std::flush;
-
-    // Redisplay (remake frame basically).
-    build_tag_gui();
-    build_entry_gui();
-
-    std::cout << tag.tag << " - " << tag.index << std::endl;
 }
 
 void Frame::OnEntryClick(wxCommandEvent &event)
 {
     const Entry& entry = entry_data.at(event.GetId());
+
+    std::filesystem::path filepath = entry.filepath;
+    if (!std::filesystem::is_directory(filepath)) {
+        // Append "/.." to filepath to access parent directory.
+        filepath = filepath.parent_path();
+    }
+
+    std::string command;
+
+# if defined (_WIN32)
+    command = "explorer.exe \"" + filepath.string() + "\"";
+# elif defined (__APPLE__)
+    command = "open '" + filepath.string() + "'";
+# elif defined (__linux__)
+    command = "xdg-open '" + filepath.string() + "'";
+# else
+#   error "Platform is not supported; can not implement file-opening feature."
+# endif
+
+    std::cout << command << std::endl;
+    system(command.data());
+
     std::cout << entry.filepath << " - " << entry.index << std::endl;
 }
 
@@ -298,6 +353,10 @@ Frame::Frame()
          tags.Count(), tags.begin(),
          wxLB_MULTIPLE);
 
+    for (size_t i = 0; i < tag_list->GetCount(); ++i) {
+        tag_list_indices[i] = i;
+    }
+
     // Populate entry_list.
     for (const Entry& entry : entry_data) {
         wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
@@ -307,6 +366,7 @@ Frame::Frame()
     layout->Add(tag_list, 1, wxEXPAND);
     layout->Add(entry_list);
 
+    layout->Layout();
     SetSizer(layout);
 
     Bind(wxEVT_LISTBOX, &Frame::OnTagSelectionChange, this);
