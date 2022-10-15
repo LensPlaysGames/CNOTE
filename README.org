@@ -1,0 +1,12 @@
+* C-NOTE
+
+Here's the plan: I need to organize files. Like a lot of files. But, they are all plaintext, or something akin to it (markdown or similar). They all have to do with one over-arching topic, but themselves span many different topics.
+
+For every file in every subdirectory, check for tags at beginning of file (need some sort of marker or format to look for), then we can collect a set of tags which each point to their own list of entries. We can have a list of entries that stores all files with tags.
+
+Then, we can have the user select any amount of tags, and only display entries matching any and all selected tags. Maybe eventually have different tools for tag selection, so they can be excluded, included, etc.
+
+
+** Building
+
+- [[https://wxwidgets.org/downloads/][wxWidgets]]
