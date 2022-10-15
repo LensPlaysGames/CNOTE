@@ -1,5 +1,7 @@
 * C-NOTE
 
+- TODO: Accept single command line argument; a directory filepath that is searched instead of the current working directory.
+
 - TODO: Subclass wxButton and handle left/right/double clicks separately for more functionality when selecting entries in the bottom panel. For example, left click could open in text editor, while right click could navigate to in file explorer.
 
 Here's the plan: I need to organize files. Like a lot of files. But, they are all plaintext, or something akin to it (markdown or similar). They all have to do with one over-arching topic, but themselves span many different topics.
