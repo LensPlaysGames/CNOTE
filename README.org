@@ -12,8 +12,12 @@ Then, we can have the user select any amount of tags, and only display entries m
 
 
 ** Building
+There are three ways to build this program on Linux and Windows:
+1. Run `./build.sh` on Linux or `build.bat` on Windows. If you don't trust the script, just take a look at it before running it; it's like 10 LOC.
+2. Use cmake, wait for it to do nothing, and PRAY that it hasn't crashed and it's actually just been downloading submodules for 30 minutes because your internet connexion is trash
+3. Run `git submodule update --init --recursive && mkdir -p out && cd out && cmake .. -GNinja && ninja -j $(nproc)`. Replace the last two commands with whatever their equivalent is on Windows if you're running windows.
 
-- [[https://wxwidgets.org/downloads/][wxWidgets]]
+If, by some evil and unfortunate twist of fate, you are using a mac, just er, idk, follow step 1, I guess. It's basically just unix anyway.
 
 
 
