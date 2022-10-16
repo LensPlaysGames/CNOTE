@@ -5,6 +5,7 @@ project(CNOTE_PROJECT LANGUAGES CXX)
 ##  Global vars
 ## ============================================================================
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}")
 
 ## ============================================================================
 ##  CCache
@@ -41,7 +42,11 @@ add_subdirectory(libs/fmt)
 ## ============================================================================
 ##  CNOTE
 ## ============================================================================
-add_executable (CNOTE src/main.cpp)
+if (WIN32)
+  add_executable (CNOTE WIN32 src/main.cpp)
+else()
+  add_executable (CNOTE src/main.cpp)
+endif()
 
 # wxWidget stuff
 target_include_directories(CNOTE PRIVATE
