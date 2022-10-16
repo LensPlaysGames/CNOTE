@@ -2,7 +2,9 @@
 #  define __WXMSW__
 #endif
 
-#define _UNICODE
+#ifndef _UNICODE
+#  define _UNICODE
+#endif
 
 #include <wx/wxprec.h>
 
@@ -18,47 +20,131 @@
 #include <set>
 #include <unordered_set>
 #include <map>
+#include <ranges>
 
-struct Entry;
+namespace ranges = std::ranges;
+namespace fs = std::filesystem;
+using namespace std::string_literals;
+using namespace std::string_view_literals;
+
+/// Wrapper around cstdio FILE*.
+///
+/// This basically exists to make sure that we don't leave any files open and also
+/// to make handling I/O errors easier since we can check for errors in here instead
+/// of having to do that in every function that uses a file.
+class File {
+    FILE* file = nullptr;
+    bool readable = false;
+    bool writable = false;
+
+public:
+    /// Open a new file.
+    explicit File() = default;
+    explicit File(std::same_as<fs::path> auto path, std::string_view mode = "r") : File(path.string(), mode) {}
+    explicit File(std::string_view path, std::string_view mode = "r") { open(path, mode); }
+
+    /// Close the file upon destruction.
+    ~File() { close(); }
+
+    /// Copying a FILE* is nonsense.
+    File(const File&) = delete;
+    File& operator=(const File&) = delete;
+
+    /// Move a file.
+    File(File&& other) noexcept { *this = std::move(other); }
+    File& operator=(File&& other) noexcept {
+        // Don't move if we're moving into ourselves.
+        if (this == &other) return *this;
+
+        close();
+        file = other.file;
+        readable = other.readable;
+        writable = other.writable;
+        other.file = nullptr;
+        return *this;
+    }
+
+    /// Close a file.
+    void close() {
+        if (file) {
+            fclose(file);
+            file = nullptr;
+        }
+
+        // Reset file modes.
+        readable = writable = false;
+    }
+
+    /// Open a file.
+    void open(std::string_view path, std::string_view mode) {
+        close();
+        file = fopen(path.data(), mode.data());
+        if (!file) { /* TODO: handle error */ }
+
+        // Set file modes.
+        readable = mode.find('r') != std::string_view::npos;
+        writable = mode.find_first_of("wa") != std::string_view::npos;
+    }
+
+    /// Print a formatted string to the file.
+    template <typename... Args>
+    void print(fmt::format_string<Args...> format, Args&&... args) {
+        if (!file) { /* TODO: handle error */ }
+        if (!writable) { /* TODO: handle error */ }
+        fmt::print(file, format, std::forward<Args>(args)...);
+    }
+
+    /// Read `size` bytes from the file into `buffer`.
+    size_t read(void* buffer, size_t size) {
+        if (!file) { /* TODO: handle error */ }
+        if (!readable) { /* TODO: handle error */ }
+        return fread(buffer, 1, size, file);
+    }
+
+    /// Read up to `size` bytes from the file.
+    std::string read(size_t size) {
+        std::string result;
+        result.resize(size);
+        auto n = read(result.data(), size);
+        result.resize(n);
+        return result;
+    }
+};
 
 struct Tag {
-    Tag(std::string tag_string);
+    Tag(std::string_view tag_string);
 
     std::string tag;
     // Entries that contain this tag.
     std::unordered_set<size_t> entries;
-    size_t index;
+    size_t index = 0;
 };
 
-Tag::Tag(std::string tag_string) {
-    tag = std::move(tag_string);
-}
+Tag::Tag(std::string_view tag_string): tag(tag_string) { }
 
 struct Entry {
-    std::filesystem::path filepath;
+    fs::path filepath;
     // Tags that contain this entry.
     std::unordered_set<size_t> tags;
-    size_t index;
+    size_t index = 0;
 };
 
-Tag* add_tag(std::vector<Tag>& tags, Tag& new_tag) {
+Tag& add_tag(std::vector<Tag>& tags, Tag&& new_tag) {
     for (Tag& tag : tags) {
         if (tag.tag == new_tag.tag) {
-            return &tag;
+            return tag;
         }
     }
     new_tag.index = tags.size();
-    tags.push_back(new_tag);
-    return &tags.back();
+    tags.push_back(std::move(new_tag));
+    return tags.back();
 }
 
-class App : public wxApp {
-public:
+struct App : public wxApp {
     virtual bool OnInit() override;
 };
 
-class Frame : public wxFrame {
-public:
+struct Frame : public wxFrame {
     Frame();
 private:
     void OnEntryClick(wxCommandEvent &event);
@@ -98,7 +184,7 @@ void Frame::build_tag_gui() {
         }
         tag_list_indices[tags.GetCount()] = tag_index;
 
-        tags.Add(wxString(tag.tag.data()));
+        tags.Add(tag.tag);
     }
     // Create new tag list from tags array.
     tag_list->Set(tags);
@@ -114,7 +200,7 @@ void Frame::build_entry_gui() {
     entry_list->Clear(true);
     for (size_t entry_index : entries_shown) {
         const Entry& entry = entry_data.at(entry_index);
-        wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
+        auto* button = new wxButton(this, entry.index, entry.filepath.string());
         entry_list->Add(button, 1, 0);
     }
     entry_list->Layout();
@@ -151,30 +237,17 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
         entries_shown.clear();
         for (const Entry& entry : entry_data) {
             // If entry is contained in *all* selected tags, make entry shown.
-            bool has_all_tags = true;
-            for (size_t tag_index : tags_selected) {
-                const Tag& selected_tag = tag_data.at(tag_index);
-                if (!selected_tag.entries.contains(entry.index)) {
-                    has_all_tags = false;
-                    break;
-                }
-            }
-            if (has_all_tags) {
-                // Make entry shown iff it has all selected tags.
-                entries_shown.insert(entry.index);
-            }
+            bool has_all_tags = ranges::all_of(tags_selected,
+                [&](size_t tag_index){ return tag_data.at(tag_index).entries.contains(entry.index); });
+            if (has_all_tags) { entries_shown.insert(entry.index); }
         }
 
         // Update tags shown based on set intersection of all shown entries' tags.
         tags_shown.clear();
         for (const Tag& tag : tag_data) {
-            for (size_t entry_index : entries_shown) {
-                const Entry& entry = entry_data.at(entry_index);
-                if (entry.tags.contains(tag.index)) {
-                    tags_shown.insert(tag.index);
-                    break;
-                }
-            }
+            auto used = ranges::any_of(entries_shown,
+                [&](size_t entry_index){ return entry_data.at(entry_index).tags.contains(tag.index); });
+            if (used) { tags_shown.insert(tag.index); }
         }
 
         fmt::print("\nSelected:\n");
@@ -211,13 +284,7 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
 void Frame::OnEntryClick(wxCommandEvent &event)
 {
     const Entry& entry = entry_data.at(event.GetId());
-
-    std::filesystem::path filepath = entry.filepath;
-    if (!std::filesystem::is_directory(filepath)) {
-        // Append "/.." to filepath to access parent directory.
-        filepath = filepath.parent_path();
-    }
-
+    const auto filepath = is_directory(entry.filepath) ? entry.filepath : entry.filepath.parent_path();
 
 # if defined (_WIN32)
     static constexpr auto fmt_str = "explorer.exe \"{}\"";
@@ -229,7 +296,7 @@ void Frame::OnEntryClick(wxCommandEvent &event)
 #   error "Platform is not supported; can not implement file-opening feature."
 # endif
 
-    auto command = fmt::format(fmt_str, filepath.string());
+    const auto command = fmt::format(fmt_str, filepath.string());
     fmt::print("{}\n", command);
     system(command.data());
 
@@ -237,13 +304,12 @@ void Frame::OnEntryClick(wxCommandEvent &event)
 }
 
 Frame::Frame()
-    : wxFrame(NULL, 0, "C-NOTE")
+    : wxFrame(nullptr, 0, "C-NOTE")
 {
-    SetFont(GetFont().Scale(1.5));
+    Frame::SetFont(GetFont().Scale(1.5));
 
     // Loop over all files in the current directory.
-    auto dir = std::filesystem::directory_iterator(".");
-    for (const auto& dir_it : dir) {
+    for (const auto& dir_it : fs::directory_iterator(".")) {
         const auto& path = dir_it.path();
         if (is_directory(path)) {
             // TODO: Loop over all files in all subdirectories.
@@ -251,64 +317,59 @@ Frame::Frame()
             // Check for tags at beginning.
 
             //fmt::print("{} is a regular file.\n", path.string());
+            static constexpr size_t contents_max_size = 1024;
+            static constexpr auto whitespace = "\r\n \t\v"sv;
+            static constexpr auto tag_marker = "#:"sv;
 
-            constexpr size_t contents_max_size = 1024;
-            std::string contents;
-            contents.reserve(contents_max_size);
+            File file{path};
+            auto contents = file.read(contents_max_size);
 
-            FILE* file = fopen(path.string().c_str(), "r");
-            size_t bytes_read = fread(contents.data(), 1, contents_max_size, file);
-
-            std::string whitespace("\r\n \t\v");
-            std::string tag_marker("#:");
-
-            char* tags_string = contents.data();
+            auto sv = std::string_view{contents};
+            auto skip_whitespace = [&](std::string_view& sv) {
+                auto pos = sv.find_first_not_of(whitespace);
+                if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
+            };
 
             // Skip whitespace at beginnning.
-            size_t whitespace_at_beginning = strspn(tags_string, whitespace.data());
-            tags_string += whitespace_at_beginning;
+            skip_whitespace(sv);
+            if (sv.empty()) { continue; } // String is entirely whitespace.
 
-            if (memcmp(tags_string, tag_marker.data(), tag_marker.length()) == 0) {
+            if (sv.starts_with(tag_marker)) {
                 // Tags are at beginning.
                 // Skip past the tag marker.
-                tags_string += tag_marker.length();
+                sv.remove_prefix(tag_marker.size());
 
                 // Start to parse tags white-space separated, up until a newline is met.
                 // Find end (first newline)
-                char* end_of_tags = strstr(tags_string, "\n");
-                // TODO: Handle the case of end of file, no newline.
+                auto end_of_tags = sv.find_first_of('\n');
+                if (end_of_tags != std::string::npos) {
+                    sv.remove_suffix(sv.size() - end_of_tags);
+                }
 
-                // Add new entry to entry_data vector.
-                Entry new_entry;
-                new_entry.filepath = path.string();
-                entry_data.push_back(new_entry);
-                Entry& entry = entry_data.back();
-                entry.index = entry_data.size() - 1;
+                // Create a new entry.
+                Entry entry;
+                entry.filepath = path;
+                entry.index = entry_data.size();
 
-                while (tags_string < end_of_tags) {
-                    // Skip past all whitespace.
-                    size_t skip_amount = strspn(tags_string, whitespace.data());
-                    if (skip_amount == 0) {
-                        break;
-                    }
-                    tags_string += skip_amount;
-                    char *tag_begin = tags_string;
-
+                // Parse the tags.
+                while (skip_whitespace(sv), !sv.empty()) {
                     // Skip to the next whitespace.
-                    size_t tag_length = strcspn(tags_string, whitespace.data());
-                    tags_string += tag_length;
-                    char *tag_end = tags_string;
+                    auto end_of_tag = sv.find_first_of(whitespace);
+                    if (end_of_tag == std::string::npos) { end_of_tag = sv.size(); }
 
                     // Add the tag found to the set of tags.
-                    Tag new_tag(std::string(tag_begin, tag_end));
-                    Tag* tag = add_tag(tag_data, new_tag);
+                    Tag& tag = add_tag(tag_data, sv.substr(0, end_of_tag));
+                    sv.remove_prefix(std::min(sv.size(), end_of_tag + 1));
 
                     // Keep track of entry within tag.
-                    tag->entries.insert(entry.index);
+                    tag.entries.insert(entry.index);
 
                     // Keep track of tag within entry.
-                    entry.tags.insert(tag->index);
+                    entry.tags.insert(tag.index);
                 }
+
+                // Add the entry to entry_data vector.
+                entry_data.push_back(std::move(entry));
             }
         }
     }
@@ -338,7 +399,7 @@ Frame::Frame()
 
     // Populate tag array.
     for (const Tag& it : tag_data) {
-        tags.Add(wxString(it.tag.data()));
+        tags.Add(it.tag.data());
     }
 
     // Create new tag_list from tag array.
@@ -354,7 +415,7 @@ Frame::Frame()
 
     // Populate entry_list.
     for (const Entry& entry : entry_data) {
-        wxButton *button = new wxButton(this, entry.index, wxString(entry.filepath.c_str()));
+        auto* button = new wxButton(this, entry.index, entry.filepath.string());
         entry_list->Add(button, 1, 0);
     }
 
@@ -369,13 +430,14 @@ Frame::Frame()
 }
 
 bool App::OnInit() {
-    Frame* frame = new Frame();
+    // Do NOT delete this. frame->Show() makes it so that the library takes care
+    // of delete’ing the frame when appropriate.
+    auto* frame = new Frame();
     frame->Show(true);
     return true;
 }
 
-void Frame::OnExit(wxCommandEvent& event) {
-    (void)event;
+void Frame::OnExit(wxCommandEvent&) {
     Close(true);
 }
 
