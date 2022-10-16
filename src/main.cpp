@@ -10,8 +10,10 @@
     #include <wx/wx.h>
 #endif
 
+#include <fmt/format.h>
+
 #include <filesystem>
-#include <string.h>
+#include <cstring>
 #include <string>
 #include <set>
 #include <unordered_set>
@@ -91,7 +93,7 @@ void Frame::build_tag_gui() {
     for (size_t tag_index : tags_shown) {
         Tag& tag = tag_data.at(tag_index);
         if (tags_selected.contains(tag_index)) {
-            std::cout << tag_index << " is shown and selected. " << tags.GetCount() << std::endl;
+            fmt::print("{} is shown and selected. {}\n", tag_index, tags.GetCount());
             tags_selected_list_index.insert(tags.GetCount());
         }
         tag_list_indices[tags.GetCount()] = tag_index;
@@ -120,20 +122,18 @@ void Frame::build_entry_gui() {
 
 void Frame::OnTagSelectionChange(wxCommandEvent &event)
 {
-    std::cout << "\ntag int: " << event.GetInt() << "\n";
+    fmt::print("\ntag int: {}\n", event.GetInt());
 
-    std::cout << "\nmap:\n";
+    fmt::print("\nmap:\n");
     try {
 
         for (const auto& [tag_list_index, tag_data_index] : tag_list_indices) {
-            std::cout << "  (" << tag_list_index << ", " << tag_data_index << ")\n";
+            fmt::print("  ({},{})\n", tag_list_index, tag_data_index);
         }
-        std::cout << std::flush;
 
         size_t tag_data_index = tag_list_indices.at(event.GetInt());
 
-        std::cout << "\nnew int: " << event.GetInt() << "\n";
-        std::cout << std::flush;
+        fmt::print("\nnew int: {}\n", event.GetInt());
 
         const Tag& tag = tag_data.at(tag_data_index);
 
@@ -177,35 +177,33 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
             }
         }
 
-        std::cout << "\nSelected:\n";
+        fmt::print("\nSelected:\n");
         for (size_t tag_index : tags_selected) {
             const Tag& tag = tag_data.at(tag_index);
-            std::cout << tag.tag << " - " << tag.index << "\n";
+            fmt::print("{} - {}\n", tag.tag, tag.index);
         }
 
-        //    std::cout << "\nShown:\n";
+        //    fmt::print("\nShown:\n");
         //    for (size_t tag_index : tags_shown) {
         //        const Tag& tag = tag_data.at(tag_index);
-        //        std::cout << tag.tag << " - " << tag.index << "\n";
+        //        fmt::print("{} - {}\n", tag.tag, tag.index);
         //    }
         //
-        //    std::cout << "\nShown Entries:\n";
+        //    fmt::print("\nShown Entries:\n");
         //    for (size_t entry_index : entries_shown) {
         //        const Entry& entry = entry_data.at(entry_index);
-        //        std::cout << entry.filepath << " - " << entry.index << "\n";
+        //        fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
         //    }
-
-        std::cout << std::flush;
 
         // Redisplay (remake frame basically).
         build_tag_gui();
         build_entry_gui();
         layout->Layout();
 
-        std::cout << tag.tag << " - " << tag.index << std::endl;
+        fmt::print("{} - {}\n", tag.tag, tag.index);
 
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        fmt::print("{}\n", e.what());
     }
 
 }
@@ -220,22 +218,22 @@ void Frame::OnEntryClick(wxCommandEvent &event)
         filepath = filepath.parent_path();
     }
 
-    std::string command;
 
 # if defined (_WIN32)
-    command = "explorer.exe \"" + filepath.string() + "\"";
+    static constexpr auto fmt_str = "explorer.exe \"{}\"";
 # elif defined (__APPLE__)
-    command = "open '" + filepath.string() + "'";
+    static constexpr auto fmt_str = "open '{}'";
 # elif defined (__linux__)
-    command = "xdg-open '" + filepath.string() + "'";
+    static constexpr auto fmt_str = "xdg-open '{}'";
 # else
 #   error "Platform is not supported; can not implement file-opening feature."
 # endif
 
-    std::cout << command << std::endl;
+    auto command = fmt::format(fmt_str, filepath.string());
+    fmt::print("{}\n", command);
     system(command.data());
 
-    std::cout << entry.filepath << " - " << entry.index << std::endl;
+    fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
 }
 
 Frame::Frame()
@@ -252,7 +250,7 @@ Frame::Frame()
         } else if (is_regular_file(path)) {
             // Check for tags at beginning.
 
-            //std::cout << path << " is a regular file." << std::endl;
+            //fmt::print("{} is a regular file.\n", path.string());
 
             constexpr size_t contents_max_size = 1024;
             std::string contents;
@@ -315,24 +313,21 @@ Frame::Frame()
         }
     }
 
-    std::cout << "Tags\n";
+    fmt::print("Tags\n");
     for (const Tag& it : tag_data) {
-        std::cout << it.tag << "\n";
+        fmt::print("{}\n", it.tag);
         for (size_t entry_index : it.entries) {
-            std::cout << "  "
-                      << entry_data.at(entry_index).filepath.string().c_str()
-                      << "\n";
+            fmt::print("  {}\n", entry_data.at(entry_index).filepath.string());
         }
     }
 
-    std::cout << "Entries\n";
+    fmt::print("Entries\n");
     for (const auto& it : entry_data) {
-        std::cout << it.filepath << "\n";
+        fmt::print("{}\n", it.filepath.string());
         for (size_t tag_index : it.tags) {
-            std::cout << "  " << tag_data.at(tag_index).tag << "\n";
+            fmt::print("  {}\n", tag_data.at(tag_index).tag);
         }
     }
-    std::cout << std::flush;
 
 
     // Create layout
