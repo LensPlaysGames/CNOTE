@@ -23,8 +23,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 ##  Submodules
 ## ============================================================================
 # Download submodules if we haven't done that already.
-# We use add_custom_target() instead of execute_process() so we can see the output
-# of the git command in real time using USES_TERMINAL.
 if (NOT EXISTS "${PROJECT_SOURCE_DIR}/libs/wxWidgets/README.md")
   execute_process(
     COMMAND git submodule update --init --recursive
