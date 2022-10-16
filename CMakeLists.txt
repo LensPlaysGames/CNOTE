@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.22)
+project(CNOTE_PROJECT LANGUAGES CXX)
 
+## ============================================================================
+##  Global vars
+## ============================================================================
+set(CMAKE_CXX_STANDARD 20)
+
+## ============================================================================
+##  CCache
+## ============================================================================
 # Use `ccache` if it is installed in system's PATH.
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -9,44 +18,39 @@ endif()
 # Export compilation database in JSON format.
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
-project(CNOTE_PROJECT LANGUAGES CXX)
+## ============================================================================
+##  Submodules
+## ============================================================================
+# Download submodules if we haven't done that already.
+if (NOT EXISTS "${PROJECT_SOURCE_DIR}/libs/wxWidgets/README.md")
+  execute_process(
+    COMMAND git submodule update --init --recursive
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    COMMAND_ERROR_IS_FATAL ANY
+    ECHO_ERROR_VARIABLE
+    USES_TERMINAL
+  )
+endif()
 
-add_executable (
-  CNOTE
-  src/main.cpp
-)
-set_property(TARGET CNOTE PROPERTY CXX_STANDARD 20)
+add_subdirectory(libs/wxWidgets)
 
-target_include_directories (
-  CNOTE
-  PUBLIC
-  wxWidgets/wxMSW-3.2.1_gcc1030TDM_x64_Dev/lib/gcc1030TDM_x64_dll/mswud
-  wxWidgets/wxWidgets-3.2.1-headers/include
-)
+## ============================================================================
+##  CNOTE
+## ============================================================================
+add_executable (CNOTE src/main.cpp)
 
-target_link_directories (
-  CNOTE
-  PUBLIC
-  wxWidgets/wxMSW-3.2.1_gcc1030TDM_x64_Dev/lib/gcc1030TDM_x64_dll
-)
+# wxWidget stuff
+target_include_directories(CNOTE PRIVATE "${PROJECT_SOURCE_DIR}/libs/wxWidgets/include")
+target_link_libraries (CNOTE PRIVATE wx::net wx::core wx::base)
 
-target_link_libraries (
-  CNOTE
-  PUBLIC
-  wxmsw32ud_core
-  wxbase32ud
-  wxtiffd
-  wxjpegd
-  wxpngd
-  wxzlibd
-  wxregexud
-  wxexpatd
-)
-
-target_compile_options (
-  CNOTE
-  PRIVATE
-  -Wall
-  -Wextra
-  -pedantic
-)
+# Compile options
+if (NOT MSVC)
+  target_compile_options (
+    CNOTE PRIVATE
+    -Wall
+    -Wextra
+    -pedantic
+  )
+else()
+  target_compile_options(CNOTE PRIVATE /W3)
+endif()
