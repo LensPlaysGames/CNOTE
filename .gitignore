@@ -1,4 +1,5 @@
-/wxWidgets
+.idea/
+out/
 
 # MS Windows nonsense
 **/*.dll
