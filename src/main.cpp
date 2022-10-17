@@ -1,4 +1,4 @@
-#ifdef _WIN32
+#if defined (_WIN32) && !defined (__WXMSW__)
 #  define __WXMSW__
 #endif
 
@@ -172,16 +172,25 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
 void Frame::OnEntryClick(wxCommandEvent &event)
 {
     const Entry& entry = data.entries.at(event.GetId());
-    const auto filepath = is_directory(entry.filepath) ? entry.filepath : entry.filepath.parent_path();
 
 # if defined (_WIN32)
-    static constexpr auto fmt_str = "explorer.exe \"{}\"";
-# elif defined (__APPLE__)
-    static constexpr auto fmt_str = "open '{}'";
-# elif defined (__linux__)
-    static constexpr auto fmt_str = "xdg-open '{}'";
+    const auto filepath = entry.filepath;
+    std::string fmt_str{""};
+    if (is_regular_file(filepath)) {
+        fmt_str = "explorer.exe \"{}\" , /select";
+    } else {
+        fmt_str = "explorer.exe \"{}\"";
+    }
 # else
-#   error "Platform is not supported; can not implement file-opening feature."
+    const auto filepath = is_directory(entry.filepath) ? entry.filepath : entry.filepath.parent_path();
+
+#   if defined (__APPLE__)
+    static constexpr auto fmt_str = "open '{}'";
+#   elif defined (__linux__)
+    static constexpr auto fmt_str = "xdg-open '{}'";
+#   else
+#     error "Platform is not supported; can not implement file-opening feature."
+# endif
 # endif
 
     const auto command = fmt::format(fmt_str, filepath.string());
@@ -192,7 +201,7 @@ void Frame::OnEntryClick(wxCommandEvent &event)
 }
 
 void Frame::get_data() {
-    data = get_directory_tagged_entries(".", TaggedEntriesRecursion::Yes);
+    data = get_directory_tagged_entries(".", TaggedEntriesRecursion::No);
 
     fmt::print("Tags\n");
     for (const Tag& it : data.tags) {
