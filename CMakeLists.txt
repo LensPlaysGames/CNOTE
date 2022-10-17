@@ -27,7 +27,7 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/libs/wxWidgets/README.md")
   execute_process(
     COMMAND git submodule update --init --recursive
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    COMMENT "Initialising submodules. This WILL take a while."
+    #COMMENT "Initialising submodules. This WILL take a while."
     COMMAND_ERROR_IS_FATAL ANY
     ECHO_ERROR_VARIABLE
     ECHO_OUTPUT_VARIABLE
