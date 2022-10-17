@@ -2,8 +2,6 @@
 #include <unordered_set>
 #include <filesystem>
 
-namespace fs = std::filesystem;
-
 struct Tag {
     Tag(std::string_view tag_string);
 
@@ -16,7 +14,7 @@ struct Tag {
 Tag& add_tag(std::vector<Tag>& tags, Tag&& new_tag);
 
 struct Entry {
-    fs::path filepath;
+    std::filesystem::path filepath;
     // Tags that contain this entry.
     std::unordered_set<size_t> tags;
     size_t index = 0;
@@ -31,3 +29,11 @@ struct TaggedEntries {
     std::vector<Entry> entries;
     std::unordered_set<size_t> entries_shown;
 };
+
+enum TaggedEntriesRecursion {
+  No,
+  Yes,
+};
+
+TaggedEntries get_directory_tagged_entries
+(const std::filesystem::path& path, TaggedEntriesRecursion recurse);

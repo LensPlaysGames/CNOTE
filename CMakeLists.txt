@@ -40,18 +40,37 @@ add_subdirectory(libs/fmt)
 ## ============================================================================
 ##  CNOTE
 ## ============================================================================
+add_library (
+  CNOTE_LIB
+  src/cnote.cpp
+)
+
+target_include_directories (
+  CNOTE_LIB
+  PRIVATE
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/libs/fmt/include
+)
+
+target_link_libraries (
+  CNOTE_LIB
+  PRIVATE
+  fmt
+)
+
 if (WIN32)
-  add_executable (CNOTE WIN32 src/main.cpp src/cnote.cpp)
+  add_executable (CNOTE WIN32 src/main.cpp)
 else()
   add_executable (CNOTE src/main.cpp)
 endif()
 
 # wxWidget stuff
 target_include_directories(CNOTE PRIVATE
-  "${PROJECT_SOURCE_DIR}/libs/wxWidgets/include"
-  "${PROJECT_SOURCE_DIR}/libs/fmt/include"
+  ${PROJECT_SOURCE_DIR}/libs/wxWidgets/include
+  ${PROJECT_SOURCE_DIR}/libs/fmt/include
+  ${PROJECT_SOURCE_DIR}/src
 )
-target_link_libraries (CNOTE PRIVATE fmt wx::net wx::core wx::base)
+target_link_libraries (CNOTE PRIVATE CNOTE_LIB fmt wx::net wx::core wx::base)
 
 # Compile options
 if (NOT MSVC)
