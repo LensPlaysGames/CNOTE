@@ -109,6 +109,92 @@ Tag& add_tag(std::vector<Tag>& tags, Tag&& new_tag) {
     return tags.back();
 }
 
+void add_file_entry(TaggedEntries& data, const fs::path& path) {
+    // Check for tags at beginning.
+
+    //fmt::print("{} is a regular file.\n", path.string());
+    static constexpr size_t contents_max_size = 1024;
+    static constexpr auto whitespace = "\r\n \t\v"sv;
+    static constexpr auto tag_marker = "#:"sv;
+
+    File file{path};
+    auto contents = file.read(contents_max_size);
+
+    auto sv = std::string_view{contents};
+    auto skip_whitespace = [&](std::string_view& sv) {
+        auto pos = sv.find_first_not_of(whitespace);
+        if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
+    };
+
+    // Skip whitespace at beginnning.
+    skip_whitespace(sv);
+    // If file has nothing but whitespace, it is not an entry; skip it.
+    if (sv.empty()) { return; }
+
+    // Skip C-style comments.
+    if (sv.starts_with("//") || sv.starts_with("/*")) {
+        sv.remove_prefix(2);
+        // Skip to next whitespace, then begin tag parsing.
+        skip_whitespace(sv);
+        // If file has nothing but whitespace, it is not an entry; skip it.
+        if (sv.empty()) { return; }
+    }
+    // Skip latex style comments.
+    else if (sv.starts_with("%")) {
+        sv.remove_prefix(1);
+        skip_whitespace(sv);
+        if (sv.empty()) { return; }
+    }
+    // Skip LISP style comments.
+    else if (sv.starts_with(";")) {
+        while (sv.starts_with(";")) {
+            sv.remove_prefix(1);
+            // If file has nothing but whitespace, it is not an entry; skip it.
+            if (sv.empty()) { return; }
+        }
+        skip_whitespace(sv);
+        if (sv.empty()) { return; }
+    }
+
+    if (sv.starts_with(tag_marker)) {
+        // Tags are at beginning.
+        // Skip past the tag marker.
+        sv.remove_prefix(tag_marker.size());
+
+        // Start to parse tags white-space separated, up until a newline is met.
+        // Find end (first newline)
+        auto end_of_tags = sv.find_first_of('\n');
+        if (end_of_tags != std::string::npos) {
+            sv.remove_suffix(sv.size() - end_of_tags);
+        }
+
+        // Create a new entry.
+        Entry entry;
+        entry.filepath = path;
+        entry.index = data.entries.size();
+
+        // Parse the tags.
+        while (skip_whitespace(sv), !sv.empty()) {
+            // Skip to the next whitespace.
+            auto end_of_tag = sv.find_first_of(whitespace);
+            if (end_of_tag == std::string::npos) { end_of_tag = sv.size(); }
+
+            // Add the tag found to the set of tags.
+            Tag& tag = add_tag(data.tags, sv.substr(0, end_of_tag));
+            sv.remove_prefix(std::min(sv.size(), end_of_tag + 1));
+
+            // Keep track of entry within tag.
+            tag.entries.insert(entry.index);
+
+            // Keep track of tag within entry.
+            entry.tags.insert(tag.index);
+        }
+
+        // Add the entry to entry_data vector.
+        data.entries.push_back(std::move(entry));
+    }
+}
+
 TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRecursion recurse) {
     TaggedEntries data;
     // Loop over all files in the current directory.
@@ -119,64 +205,7 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
                 // TODO: Loop over all files in all subdirectories.
             }
         } else if (is_regular_file(path)) {
-            // Check for tags at beginning.
-
-            //fmt::print("{} is a regular file.\n", path.string());
-            static constexpr size_t contents_max_size = 1024;
-            static constexpr auto whitespace = "\r\n \t\v"sv;
-            static constexpr auto tag_marker = "#:"sv;
-
-            File file{path};
-            auto contents = file.read(contents_max_size);
-
-            auto sv = std::string_view{contents};
-            auto skip_whitespace = [&](std::string_view& sv) {
-                auto pos = sv.find_first_not_of(whitespace);
-                if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
-            };
-
-            // Skip whitespace at beginnning.
-            skip_whitespace(sv);
-            // If file has nothing but whitespace, it is not an entry; skip it.
-            if (sv.empty()) { continue; }
-
-            if (sv.starts_with(tag_marker)) {
-                // Tags are at beginning.
-                // Skip past the tag marker.
-                sv.remove_prefix(tag_marker.size());
-
-                // Start to parse tags white-space separated, up until a newline is met.
-                // Find end (first newline)
-                auto end_of_tags = sv.find_first_of('\n');
-                if (end_of_tags != std::string::npos) {
-                    sv.remove_suffix(sv.size() - end_of_tags);
-                }
-
-                // Create a new entry.
-                Entry entry;
-                entry.filepath = path;
-                entry.index = data.entries.size();
-
-                // Parse the tags.
-                while (skip_whitespace(sv), !sv.empty()) {
-                    // Skip to the next whitespace.
-                    auto end_of_tag = sv.find_first_of(whitespace);
-                    if (end_of_tag == std::string::npos) { end_of_tag = sv.size(); }
-
-                    // Add the tag found to the set of tags.
-                    Tag& tag = add_tag(data.tags, sv.substr(0, end_of_tag));
-                    sv.remove_prefix(std::min(sv.size(), end_of_tag + 1));
-
-                    // Keep track of entry within tag.
-                    tag.entries.insert(entry.index);
-
-                    // Keep track of tag within entry.
-                    entry.tags.insert(tag.index);
-                }
-
-                // Add the entry to entry_data vector.
-                data.entries.push_back(std::move(entry));
-            }
+            add_file_entry(data, path);
         }
     }
     return data;
