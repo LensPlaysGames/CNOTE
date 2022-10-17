@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
 # Download submodules
-if ! test -f ./libs/wxWidgets/README.md; then
+if ! test -e ./libs/wxWidgets/include; then
     echo "Initialising submodules..."
     git submodule update --init --recursive
 fi
 
-mkdir -p ./out
-cd ./out
-cmake ..
-cmake --build .
+cmake -B out
+cmake --build out
