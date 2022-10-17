@@ -9,7 +9,8 @@
 #include <wx/wxprec.h>
 
 #ifndef WX_PRECOMP
-    #include <wx/wx.h>
+#  include <wx/wx.h>
+#  include <wx/wrapsizer.h>
 #endif
 
 #include <fmt/format.h>
@@ -39,6 +40,7 @@ private:
     void OnEntryClick(wxCommandEvent &event);
     void OnTagSelectionChange(wxCommandEvent &event);
     void OnExit(wxCommandEvent& event);
+    void OnResetTagSelection(wxCommandEvent& event);
 
     TaggedEntries data;
     void get_data();
@@ -53,8 +55,53 @@ private:
     std::map<size_t, size_t> tag_list_indices;
 
     wxBoxSizer* layout;
-    wxBoxSizer* entry_list;
+    wxWrapSizer* entry_list;
+
+    void create_menubar();
+
+    void refresh_shown_tags();
+    void refresh_shown_entries();
+    void refresh_shown();
+
+    void redisplay();
 };
+
+void Frame::redisplay() {
+    build_tag_gui();
+    build_entry_gui();
+    layout->Layout();
+}
+
+void Frame::refresh_shown_tags() {
+    data.tags_shown.clear();
+    for (const Tag& tag : data.tags) {
+        // If tag is contained in any one of the shown entries, make tag shown.
+        auto used = ranges::any_of(data.entries_shown,
+                                   [&](size_t entry_index){ return data.entries.at(entry_index).tags.contains(tag.index); });
+        if (used) { data.tags_shown.insert(tag.index); }
+    }
+}
+
+void Frame::refresh_shown_entries() {
+    data.entries_shown.clear();
+    for (const Entry& entry : data.entries) {
+        // If entry is contained in *all* selected tags, make entry shown.
+        bool has_all_tags = ranges::all_of(data.tags_selected,
+                                           [&](size_t tag_index){ return data.tags.at(tag_index).entries.contains(entry.index); });
+        if (has_all_tags) { data.entries_shown.insert(entry.index); }
+    }
+}
+
+void Frame::refresh_shown() {
+    refresh_shown_entries();
+    refresh_shown_tags();
+}
+
+void Frame::OnResetTagSelection(wxCommandEvent&) {
+    data.tags_selected.clear();
+    refresh_shown();
+    redisplay();
+}
 
 void Frame::build_tag_gui() {
     // TODO: Repurpose existing elements (change string in-place)
@@ -66,7 +113,6 @@ void Frame::build_tag_gui() {
     for (size_t tag_index : data.tags_shown) {
         Tag& tag = data.tags.at(tag_index);
         if (data.tags_selected.contains(tag_index)) {
-            fmt::print("{} is shown and selected. {}\n", tag_index, tag_string_array.GetCount());
             tags_selected_list_index.insert(tag_string_array.GetCount());
         }
         // Store conversion from index into data.tags vector to index
@@ -96,77 +142,46 @@ void Frame::build_entry_gui() {
 
 void Frame::OnTagSelectionChange(wxCommandEvent &event)
 {
-    fmt::print("\ntag int: {}\n", event.GetInt());
+    //fmt::print("\nindex conversion map:\n");
+    //for (const auto& [tag_list_index, tag_data_index] : tag_list_indices) {
+    //    fmt::print("  ({},{})\n", tag_list_index, tag_data_index);
+    //}
 
-    fmt::print("\nmap:\n");
-    try {
+    size_t tag_data_index = tag_list_indices.at(event.GetInt());
 
-        for (const auto& [tag_list_index, tag_data_index] : tag_list_indices) {
-            fmt::print("  ({},{})\n", tag_list_index, tag_data_index);
-        }
+    const Tag& tag = data.tags.at(tag_data_index);
 
-        size_t tag_data_index = tag_list_indices.at(event.GetInt());
-
-        fmt::print("\nnew int: {}\n", event.GetInt());
-
-        const Tag& tag = data.tags.at(tag_data_index);
-
-        if (event.IsSelection()) {
-            // Selected.
-            // Add tag to selected tags.
-            data.tags_selected.insert(tag.index);
-        } else {
-            // Deselected.
-            // Remove tag from selected tags.
-            data.tags_selected.erase(tag.index);
-        }
-
-        // Update entries shown based on set intersection of all selected tags' entries.
-        data.entries_shown.clear();
-        for (const Entry& entry : data.entries) {
-            // If entry is contained in *all* selected tags, make entry shown.
-            bool has_all_tags = ranges::all_of(data.tags_selected,
-                [&](size_t tag_index){ return data.tags.at(tag_index).entries.contains(entry.index); });
-            if (has_all_tags) { data.entries_shown.insert(entry.index); }
-        }
-
-        // Update tags shown based on set intersection of all shown entries' tags.
-        data.tags_shown.clear();
-        for (const Tag& tag : data.tags) {
-            auto used = ranges::any_of(data.entries_shown,
-                [&](size_t entry_index){ return data.entries.at(entry_index).tags.contains(tag.index); });
-            if (used) { data.tags_shown.insert(tag.index); }
-        }
-
-        fmt::print("\nSelected:\n");
-        for (size_t tag_index : data.tags_selected) {
-            const Tag& tag = data.tags.at(tag_index);
-            fmt::print("{} - {}\n", tag.tag, tag.index);
-        }
-
-        //    fmt::print("\nShown:\n");
-        //    for (size_t tag_index : tags_shown) {
-        //        const Tag& tag = tag_data.at(tag_index);
-        //        fmt::print("{} - {}\n", tag.tag, tag.index);
-        //    }
-        //
-        //    fmt::print("\nShown Entries:\n");
-        //    for (size_t entry_index : entries_shown) {
-        //        const Entry& entry = entry_data.at(entry_index);
-        //        fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
-        //    }
-
-        // Redisplay (remake frame basically).
-        build_tag_gui();
-        build_entry_gui();
-        layout->Layout();
-
-        fmt::print("{} - {}\n", tag.tag, tag.index);
-
-    } catch (const std::exception& e) {
-        fmt::print("{}\n", e.what());
+    if (event.IsSelection()) {
+        // Selected.
+        // Add tag to selected tags.
+        data.tags_selected.insert(tag.index);
+    } else {
+        // Deselected.
+        // Remove tag from selected tags.
+        data.tags_selected.erase(tag.index);
     }
 
+    // Update entries shown based on set intersection of all selected tags' entries.
+    // Update tags shown based on set union of all shown entries' tags.
+    refresh_shown();
+
+    //fmt::print("\nSelected:\n");
+    //for (size_t tag_index : data.tags_selected) {
+    //    const Tag& tag = data.tags.at(tag_index);
+    //    fmt::print("{} - {}\n", tag.tag, tag.index);
+    //}
+    //    fmt::print("\nShown:\n");
+    //    for (size_t tag_index : tags_shown) {
+    //        const Tag& tag = tag_data.at(tag_index);
+    //        fmt::print("{} - {}\n", tag.tag, tag.index);
+    //    }
+    //    fmt::print("\nShown Entries:\n");
+    //    for (size_t entry_index : entries_shown) {
+    //        const Entry& entry = entry_data.at(entry_index);
+    //        fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
+    //    }
+
+    redisplay();
 }
 
 void Frame::OnEntryClick(wxCommandEvent &event)
@@ -194,30 +209,48 @@ void Frame::OnEntryClick(wxCommandEvent &event)
 # endif
 
     const auto command = fmt::format(fmt_str, filepath.string());
-    fmt::print("{}\n", command);
+    //fmt::print("Running command: {}\n", command);
     system(command.data());
 
-    fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
+    //fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
 }
 
 void Frame::get_data() {
     data = get_directory_tagged_entries(".", TaggedEntriesRecursion::No);
 
-    fmt::print("Tags\n");
-    for (const Tag& it : data.tags) {
-        fmt::print("{}\n", it.tag);
-        for (size_t entry_index : it.entries) {
-            fmt::print("  {}\n", data.entries.at(entry_index).filepath.string());
-        }
-    }
+    //fmt::print("Tags\n");
+    //for (const Tag& it : data.tags) {
+    //    fmt::print("{}\n", it.tag);
+    //    for (size_t entry_index : it.entries) {
+    //        fmt::print("  {}\n", data.entries.at(entry_index).filepath.string());
+    //    }
+    //}
 
-    fmt::print("Entries\n");
-    for (const auto& it : data.entries) {
-        fmt::print("{}\n", it.filepath.string());
-        for (size_t tag_index : it.tags) {
-            fmt::print("  {}\n", data.tags.at(tag_index).tag);
-        }
-    }
+    //fmt::print("Entries\n");
+    //for (const auto& it : data.entries) {
+    //    fmt::print("{}\n", it.filepath.string());
+    //    for (size_t tag_index : it.tags) {
+    //        fmt::print("  {}\n", data.tags.at(tag_index).tag);
+    //    }
+    //}
+}
+
+enum {
+    ID_RESET_TAG_SELECTION,
+};
+
+void Frame::create_menubar() {
+    wxMenu *file_menu = new wxMenu;
+    file_menu->Append(wxID_EXIT);
+    file_menu->Append(ID_RESET_TAG_SELECTION, "Reset Selected Tags");
+
+    wxMenuBar *menubar = new wxMenuBar;
+    menubar->Append(file_menu, "&File");
+
+    Frame::SetMenuBar(menubar);
+
+    Bind(wxEVT_MENU, &Frame::OnExit, this, wxID_EXIT);
+    Bind(wxEVT_MENU, &Frame::OnResetTagSelection, this, ID_RESET_TAG_SELECTION);
 }
 
 Frame::Frame()
@@ -227,9 +260,11 @@ Frame::Frame()
 
     get_data();
 
+    create_menubar();
+
     // Create layout
     layout = new wxBoxSizer(wxVERTICAL);
-    entry_list = new wxBoxSizer(wxVERTICAL);
+    entry_list = new wxWrapSizer(wxHORIZONTAL);
 
     // Create widgets, fill in data.
 
@@ -259,7 +294,7 @@ Frame::Frame()
     layout->Add(entry_list);
 
     layout->Layout();
-    SetSizer(layout);
+    Frame::SetSizer(layout);
 
     Bind(wxEVT_LISTBOX, &Frame::OnTagSelectionChange, this);
     Bind(wxEVT_BUTTON, &Frame::OnEntryClick, this);

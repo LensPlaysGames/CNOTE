@@ -113,12 +113,11 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
     // Check for tags at beginning.
 
     //fmt::print("{} is a regular file.\n", path.string());
-    static constexpr size_t contents_max_size = 1024;
     static constexpr auto whitespace = "\r\n \t\v"sv;
     static constexpr auto tag_marker = "#:"sv;
 
     File file{path};
-    auto contents = file.read(contents_max_size);
+    auto contents = file.read(1024);
 
     auto sv = std::string_view{contents};
     auto skip_whitespace = [&](std::string_view& sv) {
@@ -197,6 +196,7 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
 
 TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRecursion recurse) {
     TaggedEntries data;
+    fs::path dot_tag_file{""};
     // Loop over all files in the current directory.
     for (const auto& dir_it : fs::directory_iterator(path)) {
         const auto& path = dir_it.path();
@@ -205,8 +205,83 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
                 // TODO: Loop over all files in all subdirectories.
             }
         } else if (is_regular_file(path)) {
+            if (path.has_filename() && path.filename() == ".tag") {
+                dot_tag_file = path;
+            }
             add_file_entry(data, path);
         }
+    }
+
+    // .tag file
+
+    if (!dot_tag_file.empty()) {
+
+        // TODO: Less code duplication from add_file_entry...
+        static constexpr auto whitespace = "\r\n \t\v"sv;
+        static constexpr auto tag_marker = "#:"sv;
+
+        // Open .tag file
+        File file{dot_tag_file};
+        auto contents = file.read(1024);
+        auto sv = std::string_view{contents};
+        auto skip_whitespace = [&](std::string_view& sv) {
+            auto pos = sv.find_first_not_of(whitespace);
+            if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
+        };
+
+        // Line-by-line, read filenames, ensure their existence, and parse tags.
+
+        while (skip_whitespace(sv), !sv.empty()) {
+
+            auto line = sv.substr(0, sv.size());
+            auto end_of_line = sv.find_first_of('\n');
+            if (end_of_line != std::string::npos) {
+                line.remove_suffix(line.size() - end_of_line);
+            }
+
+            skip_whitespace(line);
+            if (line.empty()) { return data; }
+
+            auto end_of_entry_path = line.find_first_of(whitespace);
+            if (end_of_entry_path == std::string::npos) { end_of_entry_path = line.size(); }
+
+            Entry entry;
+            entry.filepath = line.substr(0, end_of_entry_path);
+            entry.index = data.entries.size();
+
+            line.remove_prefix(end_of_entry_path);
+
+            skip_whitespace(line);
+            if (line.empty()) {
+                fmt::print(".tag :: Expected \"{}\" tag marker, but got end of file.\n", tag_marker);
+                return data;
+            }
+            if (!line.starts_with(tag_marker)) {
+                fmt::print(".tag :: Expected \"{}\" tag marker, but got something else entirely.\n", tag_marker);
+                return data;
+            }
+
+            line.remove_prefix(tag_marker.size());
+
+            while (skip_whitespace(line), !line.empty()) {
+                // Skip to the next whitespace.
+                auto end_of_tag = line.find_first_of(whitespace);
+                if (end_of_tag == std::string::npos) { end_of_tag = line.size(); }
+                // Add the tag found to the set of tags.
+                Tag& tag = add_tag(data.tags, line.substr(0, end_of_tag));
+                // Eat tag from beginning of string view.
+                line.remove_prefix(std::min(line.size(), end_of_tag + 1));
+                // Keep track of entry within tag.
+                tag.entries.insert(entry.index);
+                // Keep track of tag within entry.
+                entry.tags.insert(tag.index);
+            }
+            // Add the entry to entry_data vector.
+            data.entries.push_back(std::move(entry));
+
+            sv.remove_prefix(end_of_line);
+        }
+
     }
     return data;
 }
