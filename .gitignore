@@ -1,7 +1,32 @@
+# Build artifacts (executable)
+CNOTE*
+
+# IDE specifc
+# CLion
 .idea/
+
+# VS
+**/*.vcxproj
+**/*.sln
+
+# Generated Build Folders
+bld/
+build/
+win/
+windows/
+win32/
+win64/
+lnx/
+linux/
+unix/
 out/
+test/
+tst/
 
 # MS Windows nonsense
 **/*.dll
 **/*.exe
-CNOTE
+
+
+# Language server non-sense
+compile_commands.json
