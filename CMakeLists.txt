@@ -41,7 +41,7 @@ add_subdirectory(libs/fmt)
 ##  CNOTE
 ## ============================================================================
 if (WIN32)
-  add_executable (CNOTE WIN32 src/main.cpp)
+  add_executable (CNOTE WIN32 src/main.cpp src/cnote.cpp)
 else()
   add_executable (CNOTE src/main.cpp)
 endif()
