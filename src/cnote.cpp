@@ -5,6 +5,7 @@
 #include <string_view>
 #include <unordered_set>
 #include <filesystem>
+#include <vector>
 
 namespace fs = std::filesystem;
 using namespace std::string_literals;

@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include <map>
 #include <ranges>
+#include <vector>
 
 #include "cnote.h"
 
