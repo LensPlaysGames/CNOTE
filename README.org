@@ -78,6 +78,7 @@ About the =.tag= Format: there must be whitespace in between the filepath and th
 - [[https://cmake.org/download/][CMake]]
 - A C++ Compiler ([[https://gcc.gnu.org/][~g++~]], [[https://visualstudio.microsoft.com/downloads/][~MSVC~]], even [[https://releases.llvm.org/download.html][~clang~]], etc.)
 - [[https://git-scm.com/downloads][Git]]
+- On Linux: `sudo apt install libgtk-3-dev`
 
 *** Instructions
 
