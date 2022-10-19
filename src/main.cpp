@@ -10,6 +10,7 @@
 
 #ifndef WX_PRECOMP
 #  include <wx/wx.h>
+#  include <wx/filepicker.h>
 #  include <wx/wrapsizer.h>
 #endif
 
@@ -43,7 +44,7 @@ private:
     void OnResetTagSelection(wxCommandEvent& event);
 
     TaggedEntries data;
-    void get_data();
+    void get_data(std::string dir_path);
 
     void build_tag_gui();
     wxListBox *tag_list;
@@ -55,6 +56,9 @@ private:
     std::map<size_t, size_t> tag_list_indices;
 
     wxBoxSizer* layout;
+    wxStaticBoxSizer* tags_sizer;
+    wxStaticBoxSizer* entry_sizer;
+
     wxWrapSizer* entry_list;
 
     void create_menubar();
@@ -64,7 +68,15 @@ private:
     void refresh_shown();
 
     void redisplay();
+
+    void get_data_and_refresh_gui(std::string dir_path);
 };
+
+void Frame::get_data_and_refresh_gui(std::string dir_path) {
+    get_data(dir_path);
+    refresh_shown();
+    redisplay();
+}
 
 void Frame::redisplay() {
     build_tag_gui();
@@ -134,7 +146,8 @@ void Frame::build_entry_gui() {
     entry_list->Clear(true);
     for (size_t entry_index : data.entries_shown) {
         const Entry& entry = data.entries.at(entry_index);
-        auto* button = new wxButton(this, entry.index, entry.filepath.string());
+        auto* button = new wxButton(entry_sizer->GetStaticBox(),
+                                    entry.index, entry.filepath.string());
         entry_list->Add(button, 1, 0);
     }
     entry_list->Layout();
@@ -211,12 +224,16 @@ void Frame::OnEntryClick(wxCommandEvent &event)
     const auto command = fmt::format(fmt_str, filepath.string());
     //fmt::print("Running command: {}\n", command);
     system(command.data());
-
     //fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
 }
 
-void Frame::get_data() {
-    data = get_directory_tagged_entries(".", TaggedEntriesRecursion::No);
+void Frame::get_data(std::string dir_path) {
+    if (!fs::is_directory(dir_path)) {
+        // TODO: Open a message dialog/error dialog to tell the user they must select a directory.
+        fmt::print(stderr, "Here be dragons:: dir_path was not a directory!\n");
+    }
+
+    data = get_directory_tagged_entries(dir_path, TaggedEntriesRecursion::No);
 
     //fmt::print("Tags\n");
     //for (const Tag& it : data.tags) {
@@ -258,43 +275,38 @@ Frame::Frame()
 {
     Frame::SetFont(GetFont().Scale(1.5));
 
-    get_data();
-
     create_menubar();
 
     // Create layout
     layout = new wxBoxSizer(wxVERTICAL);
+    tags_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "Tags");
+    entry_sizer = new wxStaticBoxSizer(wxVERTICAL, this, "Entries");
     entry_list = new wxWrapSizer(wxHORIZONTAL);
+    entry_list->SetContainingWindow(entry_sizer->GetStaticBox());
 
-    // Create widgets, fill in data.
+    // Create widgets
 
-    // Populate tag array.
-    for (const Tag& it : data.tags) {
-        tag_string_array.Add(it.tag.data());
-    }
+    dir_picker = new wxDirPickerCtrl(this, wxID_ANY, ".", "Directory to Search");
 
-    // Create new tag_list from tag array.
     tag_list = new wxListBox
-        (this, 0,
+        (tags_sizer->GetStaticBox(), 0,
          wxDefaultPosition, wxDefaultSize,
-         tag_string_array.Count(), tag_string_array.begin(),
-         wxLB_MULTIPLE);
+         0, NULL, wxLB_MULTIPLE);
 
-    for (size_t i = 0; i < tag_list->GetCount(); ++i) {
-        tag_list_indices[i] = i;
-    }
+    // Get data, build GUI
 
-    // Populate entry_list.
-    for (const Entry& entry : data.entries) {
-        auto* button = new wxButton(this, entry.index, entry.filepath.string());
-        entry_list->Add(button, 1, 0);
-    }
+    get_data_and_refresh_gui(".");
 
-    layout->Add(tag_list, 1, wxEXPAND);
-    layout->Add(entry_list);
+    // Overall layout.
+    tags_sizer->Add(tag_list, 1, wxEXPAND);
+    entry_sizer->Add(entry_list, 1, wxEXPAND);
+
+    layout->Add(tags_sizer, 1, wxEXPAND);
+    layout->Add(entry_sizer, 0, wxEXPAND);
 
     layout->Layout();
     Frame::SetSizer(layout);
+    Frame::Fit();
 
     Bind(wxEVT_LISTBOX, &Frame::OnTagSelectionChange, this);
     Bind(wxEVT_BUTTON, &Frame::OnEntryClick, this);
