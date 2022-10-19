@@ -36,13 +36,14 @@ struct App : public wxApp {
 };
 
 struct Frame : public wxFrame {
-    Frame();
+    Frame(std::string dir_path);
 private:
     void OnDirectoryChange(wxCommandEvent& event);
     void OnEntryClick(wxCommandEvent& event);
     void OnTagSelectionChange(wxCommandEvent& event);
     void OnExit(wxCommandEvent& event);
     void OnResetTagSelection(wxCommandEvent& event);
+    void OpenDirectoryDialog(wxCommandEvent& event);
 
     wxDirPickerCtrl* dir_picker;
 
@@ -76,9 +77,11 @@ private:
 };
 
 void Frame::get_data_and_refresh_gui(std::string dir_path) {
-    get_data(dir_path);
-    refresh_shown();
-    redisplay();
+    if (fs::is_directory(dir_path)) {
+        get_data(dir_path);
+        refresh_shown();
+        redisplay();
+    }
 }
 
 void Frame::redisplay() {
@@ -263,13 +266,25 @@ void Frame::get_data(std::string dir_path) {
 enum {
     ID_RESET_TAG_SELECTION,
     ID_REFRESH_FROM_DIRECTORY,
+    ID_OPEN_DIRECTORY,
 };
+
+void Frame::OpenDirectoryDialog(wxCommandEvent&) {
+    wxFileDialog dir_dialog{this, _("Search a new directory for tags"), dir_picker->GetPath()};
+    if (dir_dialog.ShowModal() == wxID_CANCEL) {
+        return;
+    }
+    std::string dir_path = dir_dialog.GetPath().ToStdString();
+    dir_picker->SetPath(dir_path);
+    get_data_and_refresh_gui(dir_path);
+}
 
 void Frame::create_menubar() {
     wxMenu *file_menu = new wxMenu;
     file_menu->Append(wxID_EXIT);
     file_menu->Append(ID_RESET_TAG_SELECTION, "Reset Selected Tags");
     file_menu->Append(ID_REFRESH_FROM_DIRECTORY, "Refresh From Directory");
+    file_menu->Append(ID_OPEN_DIRECTORY, "Open Directory...");
 
     wxMenuBar *menubar = new wxMenuBar;
     menubar->Append(file_menu, "&File");
@@ -279,9 +294,10 @@ void Frame::create_menubar() {
     Bind(wxEVT_MENU, &Frame::OnExit, this, wxID_EXIT);
     Bind(wxEVT_MENU, &Frame::OnResetTagSelection, this, ID_RESET_TAG_SELECTION);
     Bind(wxEVT_MENU, &Frame::OnDirectoryChange, this, ID_REFRESH_FROM_DIRECTORY);
+    Bind(wxEVT_MENU, &Frame::OpenDirectoryDialog, this, ID_OPEN_DIRECTORY);
 }
 
-Frame::Frame()
+Frame::Frame(std::string dir_path)
     : wxFrame(nullptr, 0, "C-NOTE")
 {
     Frame::SetFont(GetFont().Scale(1.5));
@@ -297,7 +313,7 @@ Frame::Frame()
 
     // Create widgets
 
-    dir_picker = new wxDirPickerCtrl(this, wxID_ANY, ".", "Directory to Search");
+    dir_picker = new wxDirPickerCtrl(this, wxID_ANY, dir_path, "Directory to Search");
 
     tag_list = new wxListBox
         (tags_sizer->GetStaticBox(), 0,
@@ -306,7 +322,7 @@ Frame::Frame()
 
     // Get data, build GUI
 
-    get_data_and_refresh_gui(".");
+    get_data_and_refresh_gui(dir_path);
 
     // Overall layout.
     tags_sizer->Add(tag_list, 1, wxEXPAND);
@@ -326,9 +342,15 @@ Frame::Frame()
 }
 
 bool App::OnInit() {
+    std::string dir_path{"."};
+    // If any amount of arguments are passed.
+    if (argc > 1) {
+        // Use the first argument passed as a directory to start in, if it is one.
+        dir_path = std::string{argv[1]};
+    }
     // Do NOT delete this. frame->Show() makes it so that the library takes care
     // of delete’ing the frame when appropriate.
-    auto* frame = new Frame();
+    auto* frame = new Frame(dir_path);
     frame->Show(true);
     return true;
 }
