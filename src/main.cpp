@@ -38,10 +38,13 @@ struct App : public wxApp {
 struct Frame : public wxFrame {
     Frame();
 private:
-    void OnEntryClick(wxCommandEvent &event);
-    void OnTagSelectionChange(wxCommandEvent &event);
+    void OnDirectoryChange(wxCommandEvent& event);
+    void OnEntryClick(wxCommandEvent& event);
+    void OnTagSelectionChange(wxCommandEvent& event);
     void OnExit(wxCommandEvent& event);
     void OnResetTagSelection(wxCommandEvent& event);
+
+    wxDirPickerCtrl* dir_picker;
 
     TaggedEntries data;
     void get_data(std::string dir_path);
@@ -151,6 +154,10 @@ void Frame::build_entry_gui() {
         entry_list->Add(button, 1, 0);
     }
     entry_list->Layout();
+}
+
+void Frame::OnDirectoryChange(wxCommandEvent&) {
+    get_data_and_refresh_gui(dir_picker->GetPath().ToStdString());
 }
 
 void Frame::OnTagSelectionChange(wxCommandEvent &event)
@@ -301,6 +308,7 @@ Frame::Frame()
     tags_sizer->Add(tag_list, 1, wxEXPAND);
     entry_sizer->Add(entry_list, 1, wxEXPAND);
 
+    layout->Add(dir_picker, 0, wxEXPAND);
     layout->Add(tags_sizer, 1, wxEXPAND);
     layout->Add(entry_sizer, 0, wxEXPAND);
 
@@ -310,6 +318,7 @@ Frame::Frame()
 
     Bind(wxEVT_LISTBOX, &Frame::OnTagSelectionChange, this);
     Bind(wxEVT_BUTTON, &Frame::OnEntryClick, this);
+    Bind(wxEVT_DIRPICKER_CHANGED, &Frame::OnDirectoryChange, this);
 }
 
 bool App::OnInit() {
