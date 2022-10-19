@@ -2,6 +2,8 @@
 
 C-NOTE is a file organization tool to help sort files that aren't easily sorted in directory hierarchies. C-NOTE uses a tagging system, to associate tags with entries; an entry can be a file, directory, or any valid filepath.
 
+[[file:CNOTE_WIN32.png]]
+
 # TODO: Screenshots of basic use case
 
 ** Usage
