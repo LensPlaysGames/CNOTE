@@ -238,6 +238,7 @@ void Frame::get_data(std::string dir_path) {
     if (!fs::is_directory(dir_path)) {
         // TODO: Open a message dialog/error dialog to tell the user they must select a directory.
         fmt::print(stderr, "Here be dragons:: dir_path was not a directory!\n");
+        return;
     }
 
     data = get_directory_tagged_entries(dir_path, TaggedEntriesRecursion::No);
@@ -261,12 +262,14 @@ void Frame::get_data(std::string dir_path) {
 
 enum {
     ID_RESET_TAG_SELECTION,
+    ID_REFRESH_FROM_DIRECTORY,
 };
 
 void Frame::create_menubar() {
     wxMenu *file_menu = new wxMenu;
     file_menu->Append(wxID_EXIT);
     file_menu->Append(ID_RESET_TAG_SELECTION, "Reset Selected Tags");
+    file_menu->Append(ID_REFRESH_FROM_DIRECTORY, "Refresh From Directory");
 
     wxMenuBar *menubar = new wxMenuBar;
     menubar->Append(file_menu, "&File");
@@ -275,6 +278,7 @@ void Frame::create_menubar() {
 
     Bind(wxEVT_MENU, &Frame::OnExit, this, wxID_EXIT);
     Bind(wxEVT_MENU, &Frame::OnResetTagSelection, this, ID_RESET_TAG_SELECTION);
+    Bind(wxEVT_MENU, &Frame::OnDirectoryChange, this, ID_REFRESH_FROM_DIRECTORY);
 }
 
 Frame::Frame()

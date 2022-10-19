@@ -1,1 +1,1 @@
-#: test-tag-3
+#: test-tag-3 test-tag-4
