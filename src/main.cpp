@@ -17,20 +17,15 @@
 #include <fmt/format.h>
 
 #include <filesystem>
-#include <cstring>
 #include <string>
-#include <set>
 #include <unordered_set>
 #include <map>
-#include <ranges>
 #include <vector>
 
 #include "cnote.h"
 
-namespace ranges = std::ranges;
 namespace fs = std::filesystem;
 using namespace std::string_literals;
-using namespace std::string_view_literals;
 
 struct App : public wxApp {
     virtual bool OnInit() override;
@@ -95,9 +90,13 @@ void Frame::refresh_shown_tags() {
     data.tags_shown.clear();
     for (const Tag& tag : data.tags) {
         // If tag is contained in any one of the shown entries, make tag shown.
-        auto used = ranges::any_of(data.entries_shown,
-                                   [&](size_t entry_index){ return data.entries.at(entry_index).tags.contains(tag.index); });
-        if (used) { data.tags_shown.insert(tag.index); }
+        for (auto i : data.entries_shown) {
+            const Entry& entry = data.entries.at(i);
+            if (entry.tags.find(tag.index) != entry.tags.end()) {
+                data.tags_shown.insert(tag.index);
+                break;
+            }
+        }
     }
 }
 
@@ -105,8 +104,14 @@ void Frame::refresh_shown_entries() {
     data.entries_shown.clear();
     for (const Entry& entry : data.entries) {
         // If entry is contained in *all* selected tags, make entry shown.
-        bool has_all_tags = ranges::all_of(data.tags_selected,
-                                           [&](size_t tag_index){ return data.tags.at(tag_index).entries.contains(entry.index); });
+        bool has_all_tags = true;
+        for (auto i: data.tags_selected) {
+            const Tag& tag = data.tags.at(i);
+            if (tag.entries.find(entry.index) == tag.entries.end()) {
+                has_all_tags = false;
+                break;
+            }
+        }
         if (has_all_tags) { data.entries_shown.insert(entry.index); }
     }
 }
@@ -131,7 +136,7 @@ void Frame::build_tag_gui() {
     tag_list_indices.clear();
     for (size_t tag_index : data.tags_shown) {
         Tag& tag = data.tags.at(tag_index);
-        if (data.tags_selected.contains(tag_index)) {
+        if (data.tags_selected.find(tag_index) != data.tags_selected.end()) {
             tags_selected_list_index.insert(tag_string_array.GetCount());
         }
         // Store conversion from index into data.tags vector to index

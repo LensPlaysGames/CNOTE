@@ -2,16 +2,13 @@
 
 #include <fmt/format.h>
 
-#include <concepts>
-#include <string_view>
 #include <unordered_set>
 #include <filesystem>
 #include <vector>
+#include <string>
 
 namespace fs = std::filesystem;
 using namespace std::string_literals;
-using namespace std::string_view_literals;
-
 
 /// Wrapper around cstdio FILE*.
 ///
@@ -26,9 +23,8 @@ class File {
 public:
     /// Open a new file.
     explicit File() = default;
-    explicit File(std::string_view path, std::string_view mode = "r") { open(path, mode); }
-    explicit File(std::same_as<fs::path> auto path, std::string_view mode = "r") : File(path.string(), mode) {}
-    explicit File(fs::path path, std::string_view mode = "r") { open(path.string(), mode); }
+    explicit File(std::string path, std::string mode = "r") { open(path, mode); }
+    explicit File(fs::path path, std::string mode = "r") { open(path.string(), mode); }
 
     /// Close the file upon destruction.
     ~File() { close(); }
@@ -63,14 +59,14 @@ public:
     }
 
     /// Open a file.
-    void open(std::string_view path, std::string_view mode) {
+    void open(std::string path, std::string mode) {
         close();
         file = fopen(path.data(), mode.data());
         if (!file) { /* TODO: handle error */ }
 
         // Set file modes.
-        readable = mode.find('r') != std::string_view::npos;
-        writable = mode.find_first_of("wa") != std::string_view::npos;
+        readable = mode.find('r') != std::string::npos;
+        writable = mode.find_first_of("wa") != std::string::npos;
     }
 
     /// Print a formatted string to the file.
@@ -99,7 +95,7 @@ public:
 };
 
 
-Tag::Tag(std::string_view tag_string): tag(tag_string) { }
+Tag::Tag(std::string tag_string) { tag = tag_string; }
 
 Tag& add_tag(std::vector<Tag>& tags, Tag&& new_tag) {
     for (Tag& tag : tags) {
@@ -116,58 +112,60 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
     // Check for tags at beginning.
 
     //fmt::print("{} is a regular file.\n", path.string());
-    static constexpr auto whitespace = "\r\n \t\v"sv;
-    static constexpr auto tag_marker = "#:"sv;
+    static constexpr auto whitespace = "\r\n \t\v";
+    static constexpr auto tag_marker = "#:";
 
     File file{path};
     auto contents = file.read(1024);
+    contents.shrink_to_fit();
 
-    auto sv = std::string_view{contents};
-    auto skip_whitespace = [&](std::string_view& sv) {
-        auto pos = sv.find_first_not_of(whitespace);
-        if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
+    auto skip_whitespace = [&](std::string& contents) {
+        auto pos = contents.find_first_not_of(whitespace);
+        if (pos != std::string::npos) {
+            contents.erase(0, pos);
+        }
     };
 
     // Skip whitespace at beginnning.
-    skip_whitespace(sv);
+    skip_whitespace(contents);
     // If file has nothing but whitespace, it is not an entry; skip it.
-    if (sv.empty()) { return; }
+    if (contents.empty()) { return; }
 
     // Skip C-style comments.
-    if (sv.starts_with("//") || sv.starts_with("/*")) {
-        sv.remove_prefix(2);
+    if (contents.rfind("//", 0) == 0 || contents.rfind("/*", 0) == 0) {
+        contents.erase(0, 2);
         // Skip to next whitespace, then begin tag parsing.
-        skip_whitespace(sv);
+        skip_whitespace(contents);
         // If file has nothing but whitespace, it is not an entry; skip it.
-        if (sv.empty()) { return; }
+        if (contents.empty()) { return; }
     }
     // Skip latex style comments.
-    else if (sv.starts_with("%")) {
-        sv.remove_prefix(1);
-        skip_whitespace(sv);
-        if (sv.empty()) { return; }
+    else if (contents.rfind("%", 0) == 0) {
+        contents.erase(0, 1);
+        skip_whitespace(contents);
+        if (contents.empty()) { return; }
     }
     // Skip LISP style comments.
-    else if (sv.starts_with(";")) {
-        while (sv.starts_with(";")) {
-            sv.remove_prefix(1);
+    else if (contents.rfind(";", 0) == 0) {
+        while (contents.rfind(";", 0) == 0) {
+            contents.erase(0, 1);
             // If file has nothing but whitespace, it is not an entry; skip it.
-            if (sv.empty()) { return; }
+            if (contents.empty()) { return; }
         }
-        skip_whitespace(sv);
-        if (sv.empty()) { return; }
+        skip_whitespace(contents);
+        if (contents.empty()) { return; }
     }
 
-    if (sv.starts_with(tag_marker)) {
+    if (contents.rfind(tag_marker, 0) == 0) {
         // Tags are at beginning.
         // Skip past the tag marker.
-        sv.remove_prefix(tag_marker.size());
+        contents.erase(0, 2);
 
         // Start to parse tags white-space separated, up until a newline is met.
         // Find end (first newline)
-        auto end_of_tags = sv.find_first_of('\n');
+        auto end_of_tags = contents.find_first_of('\n');
         if (end_of_tags != std::string::npos) {
-            sv.remove_suffix(sv.size() - end_of_tags);
+            contents.erase(end_of_tags, contents.size() - end_of_tags);
         }
 
         // Create a new entry.
@@ -176,14 +174,14 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
         entry.index = data.entries.size();
 
         // Parse the tags.
-        while (skip_whitespace(sv), !sv.empty()) {
+        while (skip_whitespace(contents), !contents.empty()) {
             // Skip to the next whitespace.
-            auto end_of_tag = sv.find_first_of(whitespace);
-            if (end_of_tag == std::string::npos) { end_of_tag = sv.size(); }
+            auto end_of_tag = contents.find_first_of(whitespace);
+            if (end_of_tag == std::string::npos) { end_of_tag = contents.length(); }
 
             // Add the tag found to the set of tags.
-            Tag& tag = add_tag(data.tags, sv.substr(0, end_of_tag));
-            sv.remove_prefix(std::min(sv.size(), end_of_tag + 1));
+            Tag& tag = add_tag(data.tags, contents.substr(0, end_of_tag));
+            contents.erase(0, std::min(contents.size(), end_of_tag + 1));
 
             // Keep track of entry within tag.
             tag.entries.insert(entry.index);
@@ -220,26 +218,26 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
     if (!dot_tag_file.empty()) {
 
         // TODO: Less code duplication from add_file_entry...
-        static constexpr auto whitespace = "\r\n \t\v"sv;
-        static constexpr auto tag_marker = "#:"sv;
+
+        static constexpr auto whitespace = "\r\n \t\v";
+        static constexpr auto tag_marker = "#:";
 
         // Open .tag file
         File file{dot_tag_file};
         auto contents = file.read(1024);
-        auto sv = std::string_view{contents};
-        auto skip_whitespace = [&](std::string_view& sv) {
-            auto pos = sv.find_first_not_of(whitespace);
-            if (pos != std::string_view::npos) { sv.remove_prefix(pos); }
+        auto skip_whitespace = [&](std::string& contents) {
+            auto pos = contents.find_first_not_of(whitespace);
+            if (pos != std::string::npos) { contents.erase(0, pos); }
         };
 
         // Line-by-line, read filenames, ensure their existence, and parse tags.
 
-        while (skip_whitespace(sv), !sv.empty()) {
+        while (skip_whitespace(contents), !contents.empty()) {
 
-            auto line = sv.substr(0, sv.size());
-            auto end_of_line = sv.find_first_of('\n');
+            auto line = contents.substr(0, contents.size());
+            auto end_of_line = line.find_first_of('\n');
             if (end_of_line != std::string::npos) {
-                line.remove_suffix(line.size() - end_of_line);
+                line.erase(end_of_line, line.length() - end_of_line);
             }
 
             skip_whitespace(line);
@@ -252,19 +250,19 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
             entry.filepath = (fs::absolute(path) / line.substr(0, end_of_entry_path)).lexically_normal();
             entry.index = data.entries.size();
 
-            line.remove_prefix(end_of_entry_path);
+            line.erase(0, end_of_entry_path);
 
             skip_whitespace(line);
             if (line.empty()) {
                 fmt::print(".tag :: Expected \"{}\" tag marker, but got end of file.\n", tag_marker);
                 return data;
             }
-            if (!line.starts_with(tag_marker)) {
+            if (line.rfind(tag_marker, 0) != 0) {
                 fmt::print(".tag :: Expected \"{}\" tag marker, but got something else entirely.\n", tag_marker);
                 return data;
             }
 
-            line.remove_prefix(tag_marker.size());
+            line.erase(0, 2);
 
             while (skip_whitespace(line), !line.empty()) {
                 // Skip to the next whitespace.
@@ -273,7 +271,7 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
                 // Add the tag found to the set of tags.
                 Tag& tag = add_tag(data.tags, line.substr(0, end_of_tag));
                 // Eat tag from beginning of string view.
-                line.remove_prefix(std::min(line.size(), end_of_tag + 1));
+                line.erase(0, std::min(line.size(), end_of_tag + 1));
                 // Keep track of entry within tag.
                 tag.entries.insert(entry.index);
                 // Keep track of tag within entry.
@@ -282,7 +280,7 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
             // Add the entry to entry_data vector.
             data.entries.push_back(std::move(entry));
 
-            sv.remove_prefix(end_of_line);
+            contents.erase(0, end_of_line);
         }
 
     }

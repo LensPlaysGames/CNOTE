@@ -1,10 +1,10 @@
-#include <string_view>
 #include <unordered_set>
 #include <filesystem>
 #include <vector>
+#include <string>
 
 struct Tag {
-    Tag(std::string_view tag_string);
+    Tag(std::string tag_string);
 
     std::string tag;
     // Entries that contain this tag.
