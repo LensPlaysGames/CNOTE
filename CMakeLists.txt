@@ -34,7 +34,14 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/libs/wxWidgets/README.md")
   )
 endif()
 
+# Don't use DLLs on Windows; this avoids the need to drag them around
+# with the executable.
+if (WIN32)
+  set(wxBUILD_SHARED OFF)
+endif()
+
 add_subdirectory(libs/wxWidgets)
+
 add_subdirectory(libs/fmt)
 
 ## ============================================================================

@@ -2,6 +2,7 @@
 
 #include <fmt/format.h>
 
+#include <concepts>
 #include <string_view>
 #include <unordered_set>
 #include <filesystem>
@@ -25,8 +26,9 @@ class File {
 public:
     /// Open a new file.
     explicit File() = default;
-    explicit File(std::same_as<fs::path> auto path, std::string_view mode = "r") : File(path.string(), mode) {}
     explicit File(std::string_view path, std::string_view mode = "r") { open(path, mode); }
+    explicit File(std::same_as<fs::path> auto path, std::string_view mode = "r") : File(path.string(), mode) {}
+    explicit File(fs::path path, std::string_view mode = "r") { open(path.string(), mode); }
 
     /// Close the file upon destruction.
     ~File() { close(); }
@@ -170,7 +172,7 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
 
         // Create a new entry.
         Entry entry;
-        entry.filepath = path;
+        entry.filepath = fs::absolute(path).lexically_normal();
         entry.index = data.entries.size();
 
         // Parse the tags.
@@ -247,7 +249,7 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
             if (end_of_entry_path == std::string::npos) { end_of_entry_path = line.size(); }
 
             Entry entry;
-            entry.filepath = line.substr(0, end_of_entry_path);
+            entry.filepath = (fs::absolute(path) / line.substr(0, end_of_entry_path)).lexically_normal();
             entry.index = data.entries.size();
 
             line.remove_prefix(end_of_entry_path);

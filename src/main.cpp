@@ -153,8 +153,9 @@ void Frame::build_entry_gui() {
     entry_list->Clear(true);
     for (size_t entry_index : data.entries_shown) {
         const Entry& entry = data.entries.at(entry_index);
-        auto* button = new wxButton(entry_sizer->GetStaticBox(),
-                                    entry.index, entry.filepath.string());
+        auto* button = new wxButton(entry_sizer->GetStaticBox(), entry.index,
+                                    //entry.filepath.string());
+                                    (entry.filepath.has_filename() ? entry.filepath.filename() : entry.filepath).string());
         entry_list->Add(button, 1, 0);
     }
     entry_list->Layout();
@@ -215,7 +216,10 @@ void Frame::OnEntryClick(wxCommandEvent &event)
 # if defined (_WIN32)
     const auto filepath = entry.filepath;
     std::string fmt_str{""};
-    if (is_regular_file(filepath)) {
+
+    if ((filepath.has_extension() && (filepath.extension() == ".pdf"))
+        || fs::is_regular_file(filepath) || fs::is_other(filepath))
+    {
         fmt_str = "explorer.exe \"{}\" , /select";
     } else {
         fmt_str = "explorer.exe \"{}\"";
@@ -229,13 +233,14 @@ void Frame::OnEntryClick(wxCommandEvent &event)
     static constexpr auto fmt_str = "xdg-open '{}'";
 #   else
 #     error "Platform is not supported; can not implement file-opening feature."
-# endif
+#   endif
 # endif
 
     const auto command = fmt::format(fmt_str, filepath.string());
     //fmt::print("Running command: {}\n", command);
     system(command.data());
     //fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
+    //std::flush(std::cout);
 }
 
 void Frame::get_data(std::string dir_path) {
