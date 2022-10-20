@@ -47,7 +47,7 @@ private:
     void get_data(std::string dir_path);
 
     void build_tag_gui();
-    wxListBox *tag_list;
+    wxListBox* tag_list;
     wxArrayString tag_string_array;
 
     void build_entry_gui();

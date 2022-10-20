@@ -2,11 +2,13 @@
 
 C-NOTE is a file organization tool to help sort files that aren't easily sorted in directory hierarchies. C-NOTE uses a tagging system, to associate tags with entries; an entry can be a file, directory, or any valid filepath.
 
+[[file:CNOTE_LINUX.png]]
 [[file:CNOTE_WIN32.png]]
 
-# TODO: Screenshots of basic use case
 
 ** Usage
+
+On Linux, hold CTRL when (de)selecting tags. Bugs are due to wxGTK, and I can't do much about them at the moment, barring a major refactor.
 
 Tags are listed in the upper panel, and files/entries are listed below (as buttons). Clicking a tag will select or deselect it. Clicking an entry will launch it, similar to double clicking in a file explorer.
 
