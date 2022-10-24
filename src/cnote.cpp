@@ -195,19 +195,19 @@ void add_file_entry(TaggedEntries& data, const fs::path& path) {
     }
 }
 
-TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRecursion recurse) {
-    TaggedEntries data;
+void add_directory_tagged_entries(TaggedEntries &data, const fs::path& dirpath, TaggedEntriesRecursion recurse) {
     fs::path dot_tag_file{""};
     // Loop over all files in the current directory.
-    for (const auto& dir_it : fs::directory_iterator(path)) {
+    for (const auto& dir_it : fs::directory_iterator(dirpath)) {
         const auto& path = dir_it.path();
         if (is_directory(path)) {
             if (recurse == TaggedEntriesRecursion::Yes) {
-                // TODO: Loop over all files in all subdirectories.
+                add_directory_tagged_entries(data, path, recurse);
             }
         } else if (is_regular_file(path)) {
             if (path.has_filename() && path.filename() == ".tag") {
                 dot_tag_file = path;
+                continue;
             }
             add_file_entry(data, path);
         }
@@ -241,13 +241,13 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
             }
 
             skip_whitespace(line);
-            if (line.empty()) { return data; }
+            if (line.empty()) { return; }
 
             auto end_of_entry_path = line.find_first_of(whitespace);
             if (end_of_entry_path == std::string::npos) { end_of_entry_path = line.size(); }
 
             Entry entry;
-            entry.filepath = (fs::absolute(path) / line.substr(0, end_of_entry_path)).lexically_normal();
+            entry.filepath = (fs::absolute(dirpath) / line.substr(0, end_of_entry_path)).lexically_normal();
             entry.index = data.entries.size();
 
             line.erase(0, end_of_entry_path);
@@ -255,11 +255,11 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
             skip_whitespace(line);
             if (line.empty()) {
                 fmt::print(".tag :: Expected \"{}\" tag marker, but got end of file.\n", tag_marker);
-                return data;
+                return;
             }
             if (line.rfind(tag_marker, 0) != 0) {
                 fmt::print(".tag :: Expected \"{}\" tag marker, but got something else entirely.\n", tag_marker);
-                return data;
+                return;
             }
 
             line.erase(0, 2);
@@ -284,5 +284,11 @@ TaggedEntries get_directory_tagged_entries(const fs::path& path, TaggedEntriesRe
         }
 
     }
+
+}
+
+TaggedEntries get_directory_tagged_entries(const fs::path& dirpath, TaggedEntriesRecursion recurse) {
+    TaggedEntries data;
+    add_directory_tagged_entries(data, dirpath, recurse);
     return data;
 }

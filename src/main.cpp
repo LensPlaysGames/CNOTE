@@ -40,8 +40,10 @@ private:
     void OnExit(wxCommandEvent& event);
     void OnResetTagSelection(wxCommandEvent& event);
     void OpenDirectoryDialog(wxCommandEvent& event);
+    void ToggleRecursionFlag(wxCommandEvent& event);
 
     wxDirPickerCtrl* dir_picker;
+    bool should_recurse = false;
 
     TaggedEntries data;
     void get_data(std::string dir_path);
@@ -105,7 +107,7 @@ void Frame::refresh_shown_entries() {
     for (const Entry& entry : data.entries) {
         // If entry is contained in *all* selected tags, make entry shown.
         bool has_all_tags = true;
-        for (auto i: data.tags_selected) {
+        for (auto i : data.tags_selected) {
             const Tag& tag = data.tags.at(i);
             if (tag.entries.find(entry.index) == tag.entries.end()) {
                 has_all_tags = false;
@@ -119,6 +121,11 @@ void Frame::refresh_shown_entries() {
 void Frame::refresh_shown() {
     refresh_shown_entries();
     refresh_shown_tags();
+}
+
+void Frame::ToggleRecursionFlag(wxCommandEvent&) {
+    should_recurse = !should_recurse;
+    get_data_and_refresh_gui(dir_picker->GetPath().ToStdString());
 }
 
 void Frame::OnResetTagSelection(wxCommandEvent&) {
@@ -181,6 +188,8 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
 
     const Tag& tag = data.tags.at(tag_data_index);
 
+    //fmt::print("Got tag: \"{}\"\n", tag.tag);
+
     if (event.IsSelection()) {
         // Selected.
         // Add tag to selected tags.
@@ -200,16 +209,16 @@ void Frame::OnTagSelectionChange(wxCommandEvent &event)
     //    const Tag& tag = data.tags.at(tag_index);
     //    fmt::print("{} - {}\n", tag.tag, tag.index);
     //}
-    //    fmt::print("\nShown:\n");
-    //    for (size_t tag_index : tags_shown) {
-    //        const Tag& tag = tag_data.at(tag_index);
-    //        fmt::print("{} - {}\n", tag.tag, tag.index);
-    //    }
-    //    fmt::print("\nShown Entries:\n");
-    //    for (size_t entry_index : entries_shown) {
-    //        const Entry& entry = entry_data.at(entry_index);
-    //        fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
-    //    }
+    //fmt::print("\nShown:\n");
+    //for (size_t tag_index : data.tags_shown) {
+    //    const Tag& tag = data.tags.at(tag_index);
+    //    fmt::print("{} - {}\n", tag.tag, tag.index);
+    //}
+    //fmt::print("\nShown Entries:\n");
+    //for (size_t entry_index : data.entries_shown) {
+    //    const Entry& entry = data.entries.at(entry_index);
+    //    fmt::print("{} - {}\n", entry.filepath.string(), entry.index);
+    //}
 
     redisplay();
 }
@@ -255,7 +264,7 @@ void Frame::get_data(std::string dir_path) {
         return;
     }
 
-    data = get_directory_tagged_entries(dir_path, TaggedEntriesRecursion::No);
+    data = get_directory_tagged_entries(dir_path, should_recurse ? Yes : No);
 
     //fmt::print("Tags\n");
     //for (const Tag& it : data.tags) {
@@ -278,6 +287,7 @@ enum {
     ID_RESET_TAG_SELECTION,
     ID_REFRESH_FROM_DIRECTORY,
     ID_OPEN_DIRECTORY,
+    ID_RECURSE,
 };
 
 void Frame::OpenDirectoryDialog(wxCommandEvent&) {
@@ -296,6 +306,7 @@ void Frame::create_menubar() {
     file_menu->Append(ID_RESET_TAG_SELECTION, "Reset Selected Tags");
     file_menu->Append(ID_REFRESH_FROM_DIRECTORY, "Refresh From Directory");
     file_menu->Append(ID_OPEN_DIRECTORY, "Open Directory...");
+    file_menu->Append(ID_RECURSE, "Recurse", "Should tagged entries also be gathered from all subdirectories?", static_cast<bool>(true));
 
     wxMenuBar *menubar = new wxMenuBar;
     menubar->Append(file_menu, "&File");
@@ -306,6 +317,7 @@ void Frame::create_menubar() {
     Bind(wxEVT_MENU, &Frame::OnResetTagSelection, this, ID_RESET_TAG_SELECTION);
     Bind(wxEVT_MENU, &Frame::OnDirectoryChange, this, ID_REFRESH_FROM_DIRECTORY);
     Bind(wxEVT_MENU, &Frame::OpenDirectoryDialog, this, ID_OPEN_DIRECTORY);
+    Bind(wxEVT_MENU, &Frame::ToggleRecursionFlag, this, ID_RECURSE);
 }
 
 Frame::Frame(std::string dir_path)
@@ -323,7 +335,6 @@ Frame::Frame(std::string dir_path)
     entry_list->SetContainingWindow(entry_sizer->GetStaticBox());
 
     // Create widgets
-
     dir_picker = new wxDirPickerCtrl(this, wxID_ANY, dir_path, "Directory to Search");
 
     tag_list = new wxListBox
@@ -331,7 +342,7 @@ Frame::Frame(std::string dir_path)
          wxDefaultPosition, wxDefaultSize,
          0, NULL, wxLB_MULTIPLE);
 
-    // Get data, build GUI
+    // Get data, build GUI data.
 
     get_data_and_refresh_gui(dir_path);
 
