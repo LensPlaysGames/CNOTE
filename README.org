@@ -12,7 +12,7 @@ On Linux, hold CTRL when (de)selecting tags. Bugs are due to wxGTK, and I can't 
 
 Tags are listed in the upper panel, and files/entries are listed below (as buttons). Clicking a tag will select or deselect it. Clicking an entry will launch it, similar to double clicking in a file explorer.
 
-When a tag is selected or de-selected, all entries shown */must/* have that tag present. If they do not, they are hidden. Once this occurs, the tags are then updated to a new list of tags, consisting only of those present in the freshly updated entry list. This allows for very efficient and intuitive searching if files, simply by selecting the right tags.
+When a tag is selected or de-selected, all entries shown */must/* have that tag present. If they do not, they are hidden. Once this occurs, the tags are then updated to a new list of tags, consisting only of those present in the freshly updated entry list. This allows for very efficient and intuitive searching of files, simply by selecting the right tags.
 
 *** How Files can be Tagged
 
