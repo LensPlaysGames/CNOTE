@@ -8,8 +8,8 @@
 
 namespace cnote {
 
-constexpr auto bytes_to_read_when_looking_for_tags = 512;
-constexpr std::string_view tag_marker = "#:";
+static constexpr auto bytes_to_read_when_looking_for_tags = 512;
+static constexpr std::string_view tag_marker = "#:";
 static constexpr auto whitespace = "\r\n \t\v";
 
 struct Context;
