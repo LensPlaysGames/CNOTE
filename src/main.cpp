@@ -31,8 +31,8 @@ void traverse_directory(
 
 int main(int argc, const char** argv) {
     struct Options {
-        std::vector<std::string_view> query_tags{};
         bool should_recurse{false};
+        std::vector<std::string_view> tags{};
     } options;
 
     for (int arg_i = 1; arg_i < argc; ++arg_i) {
@@ -44,18 +44,29 @@ int main(int argc, const char** argv) {
             options.should_recurse = true;
         } else {
             // Otherwise, it's a query tag.
-            options.query_tags.push_back(arg);
+            options.tags.push_back(arg);
         }
     }
 
     cnote::Context ctx{};
 
+    // TODO:
+    /// MODIFY MODE (+, - subcommands)
+    /// Easily modify tagfile entries
+    // cnote + foo.txt my-new-tag
+    //     Results in .tag entry: "foo.txt #: [...OLD TAGS] my-new-tag"
+    // cnote - foo.txt my-new-tag
+    //     Removes tag from .tag entry, may remove entry if no tags left.
+
+    /// STANDARD MODE (no subcommand)
+    /// Just read-out all the entries
+
     // Use Entry::MaybeCreate as seen above on all regular files within
     // working directory.
-    traverse_directory(ctx, ".", options.query_tags, options.should_recurse);
+    traverse_directory(ctx, ".", options.tags, options.should_recurse);
 
     // Also create/update entries based on the .tag dotfile.
-    ctx.tagfile(".", options.query_tags);
+    ctx.tagfile(".", options.tags);
 
     for (auto entry : ctx.entries) {
         std::printf("%s:", entry.filepath.string().data());
