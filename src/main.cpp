@@ -12,7 +12,7 @@
 #include <cnote/cnote.h>
 
 void print_help(const char* argv_0) {
-    std::printf("USAGE: %s <TAGS...>\n", argv_0);
+    std::printf("USAGE: %s [TAGS...]\n", argv_0);
 }
 
 void traverse_directory(
@@ -29,11 +29,6 @@ void traverse_directory(
 }
 
 int main(int argc, const char** argv) {
-    if (argc == 1) {
-        print_help(argv[0]);
-        return 1;
-    }
-
     struct Options {
         std::vector<std::string> query_tags{};
         bool should_recurse{false};

@@ -135,6 +135,6 @@ void Entry::MaybeCreate(Context& context, const std::string path) {
         for (auto tag : tags2) handle_tag(tag);
     }
 
-    if (entry.tags.size()) context.entries.push_back(entry);
+    if (entry.tags.size()) context.register_entry(entry);
 }
 }  // namespace cnote
