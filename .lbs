@@ -1,0 +1,14 @@
+(library
+ libcnote
+ (sources lib/cnote/cnote.cpp)
+ (include-directories inc)
+ (flags -std=c++20)
+ (flags -Wall -Wextra -Wpedantic -Werror))
+
+(executable
+ cnote
+ (sources src/main.cpp)
+ (include-directories inc)
+ (flags -Wall -Wextra -Wpedantic -Werror))
+
+(dependency cnote libcnote)
