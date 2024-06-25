@@ -2,6 +2,7 @@
 #define CNOTE_H
 
 #include <algorithm>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -21,13 +22,24 @@ struct Tag {
     std::string text;
     std::vector<std::size_t> entries;
 
-    bool operator==(const std::string_view other) const { return text == other; };
+    bool operator==(const std::string_view other) const {
+        return text == other;
+    };
     bool operator==(const Tag& other) const { return operator==(other.text); };
 };
 
+// Split into whitespace separated words and return a list of unique words.
+std::vector<std::string> parse_tags(std::string_view& some_tags);
+// Skips whitespace and common comment-starting characters at beginning of
+// line, then calls parse_tags() iff tag_marker appears.
+std::vector<std::string> parse_line(std::string_view& line);
+
 struct Entry {
-    const std::string filepath;
+    const std::filesystem::path filepath;
     std::vector<std::size_t> tags;
+
+    Entry(std::filesystem::path path)
+        : filepath(path.make_preferred().lexically_normal()), tags({}) {}
 };
 
 /// To use this context, the idea is this:
@@ -56,11 +68,23 @@ struct Context {
         return found - tags.begin();
     }
 
-    std::size_t register_entry(Entry entry) {
-        entries.push_back(entry);
-        return entries.size() - 1;
+    std::size_t register_entry(const std::filesystem::path filepath) {
+        auto found = std::find_if(
+            entries.begin(), entries.end(),
+            [&](const Entry& candidate) {
+                return candidate.filepath == filepath;
+            }
+        );
+        if (found == entries.end()) {
+            entries.push_back(Entry{filepath});
+            return entries.size() - 1;
+        }
+        return found - entries.begin();
     }
-    std::size_t register_entry(
+
+    std::size_t tagfile(std::string dirpath, std::vector<std::string_view> filter_tags = {});
+
+    std::size_t traverse_file(
         const std::string_view path,
         std::vector<std::string_view> filter_tags = {}
     );

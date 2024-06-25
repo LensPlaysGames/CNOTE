@@ -25,7 +25,7 @@ void traverse_directory(
         if (should_recurse and entry.is_directory())
             traverse_directory(ctx, entry.path().string(), filter_tags, should_recurse);
         if (not entry.is_regular_file()) continue;
-        ctx.register_entry(entry.path().string(), filter_tags);
+        ctx.traverse_file(entry.path().string(), filter_tags);
     }
 }
 
@@ -54,10 +54,11 @@ int main(int argc, const char** argv) {
     // working directory.
     traverse_directory(ctx, ".", options.query_tags, options.should_recurse);
 
-    // TODO: Also create/update entries based on the .tag dotfile.
+    // Also create/update entries based on the .tag dotfile.
+    ctx.tagfile(".", options.query_tags);
 
     for (auto entry : ctx.entries) {
-        std::printf("%s:", entry.filepath.data());
+        std::printf("%s:", entry.filepath.string().data());
         for (auto tag_i : entry.tags) {
             auto tag = ctx.tags[tag_i];
             std::printf(" %s", tag.text.data());
