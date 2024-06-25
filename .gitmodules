@@ -1,6 +1,0 @@
-[submodule "libs/wxWidgets"]
-	path = libs/wxWidgets
-	url = https://github.com/wxWidgets/wxWidgets
-[submodule "libs/fmt"]
-	path = libs/fmt
-	url = https://github.com/fmtlib/fmt
