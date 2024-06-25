@@ -23,7 +23,7 @@ Resulting tags for =example_tagged_file.txt=:
 - ~some_other<>totally_f*#!$%&_crazy.tag|~
 - ~and'another~
 
-For ease of use, a single set of C (=//= or =/*=), LISP (any amount of =;=), and LaTeX comment characters (=%=) are skipped.
+For ease of use, C (=//= or =/*=), LISP (any amount of =;=), and LaTeX comment characters (=%=) are skipped, along with whitespace.
 
 Identical:
 - ~#: my-tag another-tag~
@@ -41,7 +41,7 @@ Identical:
 
 However, you may also want to tag files that have strict formats; formats that don't allow for this tag marker and tags inserted at the beginning. For that, we have a solution: the =.tag= file.
 
-The =.tag= file is an associative list of filepaths to lists of tags. This allows files that have a strict format to still be tagged, like =png=, =jpg=, =pdf=, and more! Plus, they can be launched and navigated to in the same way as regular tagged entries.
+The =.tag= file is an associative list of filepaths to lists of tags. This allows files that have a strict format to still be tagged, like =png=, =jpg=, =pdf=, and more!
 
 Example Directory:
 #+begin_example
@@ -64,8 +64,8 @@ About the =.tag= Format: there must be whitespace in between the filepath and th
 
 ** Building
 
-- [[https://cmake.org/download/][CMake]]
 - A C++ Compiler
+- [[https://cmake.org/download/][CMake]]
 
 Run the following to generate a build tree using the default generator on your system.
 #+begin_src shell
