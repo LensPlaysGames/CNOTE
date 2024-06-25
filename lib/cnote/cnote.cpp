@@ -22,6 +22,8 @@ bool skip_comments(std::string_view& s) {
     bool changed{false};
     changed = skip_whitespace(s);
 
+    if (s.starts_with(tag_marker)) return changed;
+
     // C-style comments
     if (s.starts_with("//") or s.starts_with("/*")) {
         changed = true;
@@ -35,14 +37,20 @@ bool skip_comments(std::string_view& s) {
     }
 
     // LISP comments
-    while (s.starts_with(";")) {
+    while (s.starts_with(";") and not s.starts_with(tag_marker)) {
         changed = true;
         s.remove_prefix(1);
         skip_whitespace(s);
     }
 
     // LaTeX comments
-    while (s.starts_with("%")) {
+    while (s.starts_with("%") and not s.starts_with(tag_marker)) {
+        changed = true;
+        s.remove_prefix(1);
+        skip_whitespace(s);
+    }
+
+    while (s.starts_with("#") and not s.starts_with(tag_marker)) {
         changed = true;
         s.remove_prefix(1);
         skip_whitespace(s);
@@ -269,7 +277,10 @@ std::size_t Context::tagfile(
         if (filter_tags.size()) {
             passed_at_least_one_filter = false;
             for (auto filter_tag : filter_tags) {
-                if (std::find(parsed_tags.begin(), parsed_tags.end(), filter_tag) != parsed_tags.end())
+                if (std::find(
+                        parsed_tags.begin(), parsed_tags.end(), filter_tag
+                    )
+                    != parsed_tags.end())
                     passed_at_least_one_filter = true;
             }
         }
