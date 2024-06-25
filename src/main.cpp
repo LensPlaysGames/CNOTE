@@ -65,12 +65,5 @@ int main(int argc, const char** argv) {
         std::printf("\n");
     }
 
-    // TODO: Once context is built out, we can query it for entries that
-    // correspond to a given tag.
-    // std::printf("QUERY TAGS:\n");
-    // int count = 0;
-    // for (auto tag : query_tags)
-    //   std::printf("%d: %s\n", count++, tag.data());
-
     return 0;
 }
