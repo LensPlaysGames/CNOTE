@@ -61,8 +61,7 @@ int main(int argc, const char** argv) {
     /// STANDARD MODE (no subcommand)
     /// Just read-out all the entries
 
-    // Use Entry::MaybeCreate as seen above on all regular files within
-    // working directory.
+    // Traverse working directory, finding all tagged files and creating entries (and tags) for them.
     traverse_directory(ctx, ".", options.tags, options.should_recurse);
 
     // Also create/update entries based on the .tag dotfile.
