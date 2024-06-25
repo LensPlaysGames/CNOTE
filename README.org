@@ -62,6 +62,13 @@ b     #: another-tag
 
 About the =.tag= Format: there must be whitespace in between the filepath and the tag marker. Multiple files can be tagged by using multiple lines.
 
+Each line has the following general form.
+#+begin_example
+<FILEPATH> <TAG MARKER><TAGS>
+#+end_example
+
+In the future we hope to provide a way to allow tagging files from the =.tag= file with spaces in the path.
+
 ** Building
 
 - A C++ Compiler
