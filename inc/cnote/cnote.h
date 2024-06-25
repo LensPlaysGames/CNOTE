@@ -1,6 +1,7 @@
 #ifndef CNOTE_H
 #define CNOTE_H
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -20,14 +21,13 @@ struct Tag {
     std::string text;
     std::vector<std::size_t> entries;
 
-    bool operator==(const Tag&) const = default;
+    bool operator==(const std::string_view other) const { return text == other; };
+    bool operator==(const Tag& other) const { return operator==(other.text); };
 };
 
 struct Entry {
     const std::string filepath;
     std::vector<std::size_t> tags;
-
-    static void MaybeCreate(Context& context, const std::string path);
 };
 
 /// To use this context, the idea is this:
@@ -46,14 +46,24 @@ struct Context {
     std::vector<Tag> tags;
 
     std::size_t register_tag(std::string tag) {
-        tags.push_back({std::move(tag), {}});
-        return tags.size() - 1;
+        auto found = std::find(tags.begin(), tags.end(), tag);
+        // Push new tag
+        if (found == tags.end()) {
+            tags.push_back({std::move(tag), {}});
+            return tags.size() - 1;
+        }
+        // Return tag already in cache
+        return found - tags.begin();
     }
 
     std::size_t register_entry(Entry entry) {
         entries.push_back(entry);
-        return entries.size();
+        return entries.size() - 1;
     }
+    std::size_t register_entry(
+        const std::string_view path,
+        std::vector<std::string_view> filter_tags = {}
+    );
 };
 
 }  // namespace cnote

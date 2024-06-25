@@ -18,19 +18,20 @@ void print_help(const char* argv_0) {
 void traverse_directory(
     cnote::Context& ctx,
     const std::string_view dirpath,
+    std::vector<std::string_view> filter_tags = {},
     bool should_recurse = false
 ) {
     for (auto entry : std::filesystem::directory_iterator(dirpath)) {
         if (should_recurse and entry.is_directory())
-            traverse_directory(ctx, entry.path().string(), should_recurse);
+            traverse_directory(ctx, entry.path().string(), filter_tags, should_recurse);
         if (not entry.is_regular_file()) continue;
-        cnote::Entry::MaybeCreate(ctx, entry.path());
+        ctx.register_entry(entry.path().string(), filter_tags);
     }
 }
 
 int main(int argc, const char** argv) {
     struct Options {
-        std::vector<std::string> query_tags{};
+        std::vector<std::string_view> query_tags{};
         bool should_recurse{false};
     } options;
 
@@ -43,7 +44,7 @@ int main(int argc, const char** argv) {
             options.should_recurse = true;
         } else {
             // Otherwise, it's a query tag.
-            options.query_tags.push_back(std::string(arg));
+            options.query_tags.push_back(arg);
         }
     }
 
@@ -51,7 +52,7 @@ int main(int argc, const char** argv) {
 
     // Use Entry::MaybeCreate as seen above on all regular files within
     // working directory.
-    traverse_directory(ctx, ".", options.should_recurse);
+    traverse_directory(ctx, ".", options.query_tags, options.should_recurse);
 
     // TODO: Also create/update entries based on the .tag dotfile.
 

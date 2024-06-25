@@ -1,5 +1,6 @@
 #include <cnote/cnote.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -65,13 +66,19 @@ std::vector<std::string> parse_line(std::string_view& line) {
     return out;
 }
 
-void Entry::MaybeCreate(Context& context, const std::string path) {
+std::size_t Context::register_entry(
+    const std::string_view path,
+    std::vector<std::string_view> filter_tags
+) {
+    constexpr auto noentry{(std::size_t)-1};
+
     auto f = fopen(path.data(), "rb");
     if (not f) {
         std::printf(
-            "Entry::Create(): Could not open file at %s\n", path.data()
+            "Context::register_entry(): Could not open file at %s\n",
+            path.data()
         );
-        return;
+        return noentry;
     }
 
     // Get file size
@@ -92,25 +99,25 @@ void Entry::MaybeCreate(Context& context, const std::string path) {
     if (nread != size_t(read_amount)) {
         fclose(f);
         std::printf(
-            "Entry::Create(): Trouble reading file at %s (expected %ld bytes, "
-            "got %zu)\n",
+            "Context::register_entry(): Trouble reading file at %s (expected "
+            "%ld bytes, got %zu)\n",
             path.data(), read_amount, nread
         );
-        return;
+        return noentry;
     }
 
     fclose(f);
 
-    auto entry = Entry(path, {});
-    auto entry_ref = context.entries.size();
+    auto entry = Entry(std::string(path), {});
+    auto entry_ref = entries.size();
 
     auto handle_tag = [&](const std::string& tag) {
         if (tag.empty()) return;
         // Make both Tag and Entry to store in Context, and somehow make the
         // Entry reference the Tag and the Tag reference the Entry.
-        auto tag_ref = context.register_tag(tag);
+        auto tag_ref = register_tag(tag);
         entry.tags.push_back(tag_ref);
-        context.tags.at(tag_ref).entries.push_back(entry_ref);
+        tags.at(tag_ref).entries.push_back(entry_ref);
     };
 
     auto end_of_line = contents.find_first_of('\n');
@@ -119,22 +126,42 @@ void Entry::MaybeCreate(Context& context, const std::string path) {
         end_of_line == std::string::npos ? contents.end()
                                          : contents.begin() + end_of_line
     );
-    auto tags = parse_line(line);
-    for (auto tag : tags) handle_tag(tag);
+    auto parsed_tags = parse_line(line);
+    for (auto tag : parsed_tags) handle_tag(tag);
 
     // If no tags were found AND the first line actually ended (implying
     // existence of a second line), check the second line.
-    if (tags.empty() and end_of_line != std::string::npos) {
+    if (parsed_tags.empty() and end_of_line != std::string::npos) {
         auto end_of_line2 = contents.find_first_of('\n', end_of_line + 1);
         auto line2 = std::string_view(
             contents.begin() + end_of_line + 1,
             end_of_line2 == std::string::npos ? contents.end()
                                               : contents.begin() + end_of_line2
         );
-        auto tags2 = parse_line(line2);
-        for (auto tag : tags2) handle_tag(tag);
+        auto parsed_tags2 = parse_line(line2);
+        for (auto tag : parsed_tags2) handle_tag(tag);
     }
 
-    if (entry.tags.size()) context.register_entry(entry);
+    if (entry.tags.size()) {
+        bool passed_at_least_one_filter{true};
+        if (filter_tags.size()) {
+            passed_at_least_one_filter = false;
+            for (auto filter_tag : filter_tags) {
+                if (std::find_if(
+                        entry.tags.begin(), entry.tags.end(),
+                        [&](auto candidate_i) {
+                            return tags.at(candidate_i) == filter_tag;
+                        }
+                    )
+                    != entry.tags.end())
+                    passed_at_least_one_filter = true;
+            }
+        }
+        if (not passed_at_least_one_filter) return noentry;
+
+        return register_entry(entry);
+    }
+
+    return noentry;
 }
 }  // namespace cnote
