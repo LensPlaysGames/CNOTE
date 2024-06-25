@@ -1,0 +1,78 @@
+* C-NOTE
+
+C-NOTE is a file organization tool to help sort files that aren't easily sorted in directory hierarchies. C-NOTE uses a tagging system, to associate tags with entries; an entry can be a file, directory, or any valid filepath.
+
+** How Files May Be Tagged
+
+At startup, the program searches the working directory for files with the tag marker at or near the beginning of the file: ~#:~. It then looks at the rest of the line following this tag marker, and splits it by whitespace into tags.
+
+After all entries in a directory are searched, the =.tag= file is handled.
+
+**** Tag Marker at Beginning of File
+
+> =example_tagged_file.txt=
+#+begin_example
+#: my-tag another-tag some_other<>totally_f*#!$%&_crazy.tag| and'another
+
+... file contents ...
+#+end_example
+
+Resulting tags for =example_tagged_file.txt=:
+- ~my-tag~
+- ~another-tag~
+- ~some_other<>totally_f*#!$%&_crazy.tag|~
+- ~and'another~
+
+For ease of use, a single set of C (=//= or =/*=), LISP (any amount of =;=), and LaTeX comment characters (=%=) are skipped.
+
+Identical:
+- ~#: my-tag another-tag~
+- ~#: my-tag another-tag~
+- ~% #: my-tag another-tag~
+- ~%#: my-tag another-tag~
+- ~;#: my-tag another-tag~
+- ~;;; #: my-tag another-tag~
+- ~// #: my-tag another-tag~
+- ~//#: my-tag another-tag~
+- ~/*#: my-tag another-tag~
+
+
+**** The =.tag= file
+
+However, you may also want to tag files that have strict formats; formats that don't allow for this tag marker and tags inserted at the beginning. For that, we have a solution: the =.tag= file.
+
+The =.tag= file is an associative list of filepaths to lists of tags. This allows files that have a strict format to still be tagged, like =png=, =jpg=, =pdf=, and more! Plus, they can be launched and navigated to in the same way as regular tagged entries.
+
+Example Directory:
+#+begin_example
+a
+|-- 1.txt (tagged with "my-tag")
+|-- 1.png
+|-- 2.txt (tagged with "my-tag another-tag")
+|-- b
+|   `-- ... lots of files ...
+`-- .tag
+#+end_example
+
+Example =.tag= Contents:
+#+begin_example
+1.png #: my-tag
+b     #: another-tag
+#+end_example
+
+About the =.tag= Format: there must be whitespace in between the filepath and the tag marker. Multiple files can be tagged by using multiple lines.
+
+** Building
+
+- [[https://cmake.org/download/][CMake]]
+- A C++ Compiler
+
+Run the following to generate a build tree using the default generator on your system.
+#+begin_src shell
+  cmake -B bld
+#+end_src
+
+Then, invoke the build tree to build the CLI program.
+#+begin_src shell
+  cmake --build bld
+#+end_src
