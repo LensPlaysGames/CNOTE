@@ -35,6 +35,10 @@ int main(int argc, const char** argv) {
         std::vector<std::string_view> tags{};
     } options;
 
+    // TODO: It'd be maybe nice to have a --tag-includes option where instead
+    // of searching for a tag exactly we search for any tag that includes the
+    // given text.
+
     for (int arg_i = 1; arg_i < argc; ++arg_i) {
         auto arg = std::string_view(argv[arg_i]);
         if (arg.substr(0, 2) == "-h" or arg.substr(0, 3) == "--h") {
@@ -61,7 +65,8 @@ int main(int argc, const char** argv) {
     /// STANDARD MODE (no subcommand)
     /// Just read-out all the entries
 
-    // Traverse working directory, finding all tagged files and creating entries (and tags) for them.
+    // Traverse working directory, finding all tagged files and creating entries
+    // (and tags) for them.
     traverse_directory(ctx, ".", options.tags, options.should_recurse);
 
     // Also create/update entries based on the .tag dotfile.
